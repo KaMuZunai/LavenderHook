@@ -5,6 +5,7 @@
 #include "../aobhooks/TimeHook.h"
 #include "../aobhooks/EnemiesMaxFallbackHook.h"
 #include "../aobhooks/ManaHook.h"
+#include "../aobhooks/ChatHook.h"
 
 namespace LavenderHook::Memory {
 
@@ -15,7 +16,9 @@ namespace LavenderHook::Memory {
         const bool c = TimeHook::Initialize();
         const bool d = EnemiesMaxFallbackHook::Initialize();
         const bool e = ManaHook::Initialize();
-        return a || b || c || d || e;
+        const bool f = ChatHook::Initialize();
+        if (f) Globals::chat_hook_active.store(true);
+        return a || b || c || d || e || f;
     }
 
     inline void Shutdown()
@@ -25,12 +28,14 @@ namespace LavenderHook::Memory {
         TimeHook::Shutdown();
         EnemiesMaxFallbackHook::Shutdown();
         ManaHook::Shutdown();
+        ChatHook::Shutdown();
     }
 
     // Call once per frame to update polled globals (e.g. Globals::mana_max).
     inline void Tick()
     {
         ManaHook::Tick();
+        ChatHook::Tick();
     }
 
 } // namespace LavenderHook::Memory

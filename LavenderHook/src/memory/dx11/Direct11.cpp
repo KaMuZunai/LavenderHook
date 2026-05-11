@@ -14,6 +14,7 @@
 
 #include "../../windows/HoldToKillButton.h"
 #include "../../windows/ToggleMenuButton.h"
+#include "../../windows/TravelToMenuButton.h"
 
 #include "../../input/Hotkeys.h"
 
@@ -238,6 +239,7 @@ namespace {
         UIRegistry::Get().Render();
 
         LavenderHook::UI::Widgets::RenderMenuSelectorButton(LavenderHook::Globals::show_menu);
+        LavenderHook::UI::Widgets::RenderTravelToMenuButton(LavenderHook::Globals::show_menu);
         LavenderHook::UI::Widgets::RenderHoldToKillButton(LavenderHook::Globals::show_menu);
 
         if (LavenderHook::Globals::show_menu && gui)

@@ -29,6 +29,7 @@ namespace LavenderHook::Globals
     inline bool show_macro_window = false;
     inline bool show_performance_overlay = true;
     inline bool show_wave_window = false;
+    inline bool show_travel_window = true;
     inline bool show_menu_selector_window = false;
     inline bool show_menu_logo = true;
     inline bool show_profiles_window = false;
@@ -87,4 +88,7 @@ namespace LavenderHook::Globals
 
     // Wave Timer
     inline std::atomic<int>   wave_time{ 0 };
+
+    // Chat
+    inline std::atomic<bool>  chat_hook_active{ false };
 }

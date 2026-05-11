@@ -408,7 +408,7 @@ namespace LavenderHook {
                 contentHeight += 4 * rowH * perfLayoutT;
 
                 float windowsLayoutT = (s_windowsAnim > kHideThreshold) ? s_windowsAnim : 0.0f;
-                contentHeight += 9 * rowH * windowsLayoutT;
+                contentHeight += 10 * rowH * windowsLayoutT;
 
                 // audio section
                 contentHeight += rowH; // separator/label
@@ -555,7 +555,7 @@ namespace LavenderHook {
 
                     if (windowsLayoutT > kHideThreshold)
                     {
-                        AnimatedSectionBegin("##windows_section", windowsLayoutT, 8, alpha * s_headerAnim);
+                        AnimatedSectionBegin("##windows_section", windowsLayoutT, 10, alpha * s_headerAnim);
                         ImGui::Indent(18.f);
 
                         bool bW = LavenderHook::Globals::show_general_window;
@@ -618,7 +618,6 @@ namespace LavenderHook {
                             SaveMenuSettings();
                             LavenderHook::Audio::PlayToggleSound(bW);
                         }
-
                         ImGui::Unindent(18.f);
                         AnimatedSectionEnd(windowsLayoutT);
                     }

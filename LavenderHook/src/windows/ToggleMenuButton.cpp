@@ -34,7 +34,7 @@ namespace LavenderHook {
                 ImGuiIO& io = ImGui::GetIO();
                 const ImVec2 pos(
                     io.DisplaySize.x - margin,
-                    io.DisplaySize.y - margin - (size.y + gap_up)
+                    io.DisplaySize.y - margin - (size.y + gap_up) * 2
                 );
 
                 ImGui::SetNextWindowPos(pos, ImGuiCond_Always, ImVec2(1.0f, 1.0f));

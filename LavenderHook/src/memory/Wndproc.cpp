@@ -1,5 +1,6 @@
 #include "hooks.h"
 #include "../windows/functions/MiscButtonActions.h"
+#include "../windows/TravelWindow.h"
 #include "../imgui/imgui.h"
 #include "../imgui/imgui_impl_win32.h"
 #include "../input/VirtualGamepad.h"
@@ -207,6 +208,13 @@ LRESULT CALLBACK LavenderHook::Hooks::WndProc::HookedWndProc(HWND hwnd, UINT msg
             LavenderHook::Input::RestoreHiddenWindowFromTray();
             return 0;
         }
+    }
+
+    // Handle travel to main menu (posted from TravelWindow)
+    if (msg == LavenderHook::UI::Windows::TravelWindow::GetTravelMessageId())
+    {
+        LavenderHook::UI::Windows::TravelWindow::ExecuteTravel();
+        return 0;
     }
 
     if (g_saved_original)

@@ -1,6 +1,7 @@
 ﻿cmake_minimum_required(VERSION 3.10.0)
 project(LavenderHook)
 
+
 set(CMAKE_CXX_STANDARD 17)
 
 include_directories(${CMAKE_SOURCE_DIR}/include)
@@ -50,3 +51,4 @@ endif()
 set_target_properties(LavenderHook PROPERTIES
     WINDOWS_EXPORT_ALL_SYMBOLS OFF
 )
+  

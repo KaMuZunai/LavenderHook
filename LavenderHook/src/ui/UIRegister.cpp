@@ -16,6 +16,7 @@
 #include "../windows/WaveTrackerWindow.h"
 #include "../windows/MacroManagerWindow.h"
 #include "../windows/MacroEditorWindow.h"
+#include "../windows/TravelWindow.h"
 
 
 void RegisterUIWindows()
@@ -180,4 +181,5 @@ void RegisterUIWindows()
         },
         nullptr
         });
+
 }

@@ -206,6 +206,7 @@ namespace LavenderHook::UI::Windows {
 
         ImGui::PopID();
         ImGui::Separator();
+        ImGui::Dummy(ImVec2(0, 8));
         return remove;
     }
 
