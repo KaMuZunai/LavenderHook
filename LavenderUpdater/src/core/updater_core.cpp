@@ -19,6 +19,90 @@
 #define DWMWA_USE_IMMERSIVE_DARK_MODE 20
 #endif
 
+#ifndef DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2
+#define DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 ((DPI_AWARENESS_CONTEXT)-4)
+#endif
+
+static void set_dpi_awareness()
+{
+    HMODULE hUser = GetModuleHandleW(L"user32.dll");
+    if (hUser)
+    {
+        typedef BOOL (WINAPI *SDPIA_fn)(DPI_AWARENESS_CONTEXT);
+        SDPIA_fn fn = (SDPIA_fn)GetProcAddress(hUser, "SetProcessDpiAwarenessContext");
+        if (fn)
+        {
+            fn(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+            return;
+        }
+    }
+    HMODULE hShcore = LoadLibraryW(L"shcore.dll");
+    if (hShcore)
+    {
+        typedef HRESULT (WINAPI *SDPA_fn)(int);
+        SDPA_fn fn = (SDPA_fn)GetProcAddress(hShcore, "SetProcessDpiAwareness");
+        if (fn)
+        {
+            fn(2); // PROCESS_PER_MONITOR_DPI_AWARE
+        }
+        FreeLibrary(hShcore);
+        return;
+    }
+    SetProcessDPIAware();
+}
+
+static int get_dpi()
+{
+    HMODULE hShcore = LoadLibraryW(L"shcore.dll");
+    if (hShcore)
+    {
+        typedef HRESULT (WINAPI *GDFM_fn)(HMONITOR, int, UINT*, UINT*);
+        GDFM_fn fn = (GDFM_fn)GetProcAddress(hShcore, "GetDpiForMonitor");
+        if (fn)
+        {
+            POINT pt = { 1, 1 };
+            HMONITOR hMon = MonitorFromPoint(pt, MONITOR_DEFAULTTOPRIMARY);
+            UINT dpiX = 96, dpiY = 96;
+            if (SUCCEEDED(fn(hMon, 0, &dpiX, &dpiY)))
+            {
+                FreeLibrary(hShcore);
+                return dpiX;
+            }
+        }
+        FreeLibrary(hShcore);
+    }
+    HKEY hKey;
+    if (RegOpenKeyExW(HKEY_CURRENT_USER, L"Control Panel\\Desktop\\WindowMetrics",
+        0, KEY_READ, &hKey) == ERROR_SUCCESS)
+    {
+        DWORD dpi = 0;
+        DWORD size = sizeof(dpi);
+        RegQueryValueExW(hKey, L"AppliedDPI", NULL, NULL, (LPBYTE)&dpi, &size);
+        RegCloseKey(hKey);
+        if (dpi >= 96)
+            return dpi;
+    }
+    HDC hdc = GetDC(NULL);
+    int dpi = GetDeviceCaps(hdc, LOGPIXELSX);
+    ReleaseDC(NULL, hdc);
+    return dpi >= 96 ? dpi : 96;
+}
+
+static float dpi_scale_factor()
+{
+    return get_dpi() / 96.0f;
+}
+
+static int Scale(int val)
+{
+    return static_cast<int>(val * dpi_scale_factor() + 0.5f);
+}
+
+static int FontHeight(int pt)
+{
+    return MulDiv(pt, get_dpi(), 72);
+}
+
 // Theme 
 static const COLORREF COL_BG        = RGB(0x1E, 0x1E, 0x2E);
 static const COLORREF COL_ACCENT    = RGB(0x7C, 0x3A, 0xED);
@@ -43,6 +127,12 @@ struct UpdateDlgData
     HBRUSH      hBrushBg;
     HFONT       hFontTitle;
     HFONT       hFontBody;
+    int         currentDpi;
+    HWND        hHdr;
+    HWND        hMsg;
+    HWND        hChk;
+    HWND        hYes;
+    HWND        hNo;
 };
 
 // helpers
@@ -229,7 +319,7 @@ static void draw_checkbox(LPDRAWITEMSTRUCT dis, bool checked)
     DeleteObject(hBrBg);
 
     // 13x13 box, vertically centred in the control rect
-    const int BOX = 13;
+    const int BOX = Scale(13);
     int bx = rc.left;
     int by = rc.top + (rc.bottom - rc.top - BOX) / 2;
 
@@ -277,43 +367,44 @@ static LRESULT CALLBACK UpdateDlgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM
         d = reinterpret_cast<UpdateDlgData*>(cs->lpCreateParams);
         SetWindowLongPtrW(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(d));
 
+        d->currentDpi = get_dpi();
         d->hBrushBg   = CreateSolidBrush(COL_BG);
-        d->hFontTitle = CreateFontW(-15, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE,
+        d->hFontTitle = CreateFontW(FontHeight(15), 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE,
             DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
             CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_SWISS, L"Segoe UI");
-        d->hFontBody  = CreateFontW(-12, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+        d->hFontBody  = CreateFontW(FontHeight(12), 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
             DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
             CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_SWISS, L"Segoe UI");
 
-        HWND hHdr = CreateWindowExW(0, L"STATIC", L"Update Available",
+        d->hHdr = CreateWindowExW(0, L"STATIC", L"Update Available",
             WS_CHILD | WS_VISIBLE | SS_LEFT,
-            15, 12, 330, 22, hwnd, (HMENU)IDC_LBL_HEADER, NULL, NULL);
-        SendMessageW(hHdr, WM_SETFONT, (WPARAM)d->hFontTitle, TRUE);
+            Scale(15), Scale(12), Scale(330), Scale(22), hwnd, (HMENU)IDC_LBL_HEADER, NULL, NULL);
+        SendMessageW(d->hHdr, WM_SETFONT, (WPARAM)d->hFontTitle, TRUE);
 
         std::wstring lv(d->localVersion.begin(), d->localVersion.end());
         std::wstring rv(d->remoteVersion.begin(), d->remoteVersion.end());
         std::wstring msgTxt = lv + L" \u2192 " + rv +
             L"\nWould you like to update LavenderHook?";
-        HWND hMsg = CreateWindowExW(0, L"STATIC", msgTxt.c_str(),
+        d->hMsg = CreateWindowExW(0, L"STATIC", msgTxt.c_str(),
             WS_CHILD | WS_VISIBLE | SS_LEFT,
-            15, 40, 330, 44, hwnd, (HMENU)IDC_LBL_MSG, NULL, NULL);
-        SendMessageW(hMsg, WM_SETFONT, (WPARAM)d->hFontBody, TRUE);
+            Scale(15), Scale(40), Scale(330), Scale(44), hwnd, (HMENU)IDC_LBL_MSG, NULL, NULL);
+        SendMessageW(d->hMsg, WM_SETFONT, (WPARAM)d->hFontBody, TRUE);
 
-        HWND hChk = CreateWindowExW(0, L"BUTTON",
+        d->hChk = CreateWindowExW(0, L"BUTTON",
             L"Don\u2019t remind me again for this version",
             WS_CHILD | WS_VISIBLE | BS_OWNERDRAW,
-            15, 94, 330, 20, hwnd, (HMENU)IDC_CHK_REMIND, NULL, NULL);
-        SendMessageW(hChk, WM_SETFONT, (WPARAM)d->hFontBody, TRUE);
+            Scale(15), Scale(94), Scale(330), Scale(20), hwnd, (HMENU)IDC_CHK_REMIND, NULL, NULL);
+        SendMessageW(d->hChk, WM_SETFONT, (WPARAM)d->hFontBody, TRUE);
 
-        HWND hYes = CreateWindowExW(0, L"BUTTON", L"Yes",
+        d->hYes = CreateWindowExW(0, L"BUTTON", L"Yes",
             WS_CHILD | WS_VISIBLE | BS_OWNERDRAW,
-            15, 124, 80, 28, hwnd, (HMENU)IDC_BTN_YES, NULL, NULL);
-        SendMessageW(hYes, WM_SETFONT, (WPARAM)d->hFontBody, TRUE);
+            Scale(15), Scale(124), Scale(80), Scale(28), hwnd, (HMENU)IDC_BTN_YES, NULL, NULL);
+        SendMessageW(d->hYes, WM_SETFONT, (WPARAM)d->hFontBody, TRUE);
 
-        HWND hNo = CreateWindowExW(0, L"BUTTON", L"No",
+        d->hNo = CreateWindowExW(0, L"BUTTON", L"No",
             WS_CHILD | WS_VISIBLE | BS_OWNERDRAW,
-            107, 124, 80, 28, hwnd, (HMENU)IDC_BTN_NO, NULL, NULL);
-        SendMessageW(hNo, WM_SETFONT, (WPARAM)d->hFontBody, TRUE);
+            Scale(107), Scale(124), Scale(80), Scale(28), hwnd, (HMENU)IDC_BTN_NO, NULL, NULL);
+        SendMessageW(d->hNo, WM_SETFONT, (WPARAM)d->hFontBody, TRUE);
 
         return 0;
     }
@@ -404,6 +495,58 @@ static LRESULT CALLBACK UpdateDlgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM
         return 0;
     }
 
+    case WM_DPICHANGED:
+    {
+        int newDpi = LOWORD(wParam);
+        if (d && newDpi != d->currentDpi)
+        {
+            d->currentDpi = newDpi;
+            if (d->hFontTitle) { DeleteObject(d->hFontTitle); d->hFontTitle = NULL; }
+            if (d->hFontBody)  { DeleteObject(d->hFontBody);  d->hFontBody  = NULL; }
+            d->hFontTitle = CreateFontW(MulDiv(15, newDpi, 72), 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE,
+                DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+                CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_SWISS, L"Segoe UI");
+            d->hFontBody  = CreateFontW(MulDiv(12, newDpi, 72), 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+                DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+                CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_SWISS, L"Segoe UI");
+
+            auto S = [newDpi](int v) { return MulDiv(v, newDpi, 96); };
+
+            SetWindowPos(d->hHdr, NULL, S(15), S(12), S(330), S(22), SWP_NOZORDER);
+            SendMessageW(d->hHdr, WM_SETFONT, (WPARAM)d->hFontTitle, TRUE);
+            SetWindowPos(d->hMsg, NULL, S(15), S(40), S(330), S(44), SWP_NOZORDER);
+            SendMessageW(d->hMsg, WM_SETFONT, (WPARAM)d->hFontBody, TRUE);
+            SetWindowPos(d->hChk, NULL, S(15), S(94), S(330), S(20), SWP_NOZORDER);
+            SendMessageW(d->hChk, WM_SETFONT, (WPARAM)d->hFontBody, TRUE);
+            SetWindowPos(d->hYes, NULL, S(15), S(124), S(80), S(28), SWP_NOZORDER);
+            SendMessageW(d->hYes, WM_SETFONT, (WPARAM)d->hFontBody, TRUE);
+            SetWindowPos(d->hNo, NULL, S(107), S(124), S(80), S(28), SWP_NOZORDER);
+            SendMessageW(d->hNo, WM_SETFONT, (WPARAM)d->hFontBody, TRUE);
+
+            RECT *suggested = reinterpret_cast<RECT*>(lParam);
+            SetWindowPos(hwnd, NULL,
+                suggested->left, suggested->top,
+                suggested->right - suggested->left,
+                suggested->bottom - suggested->top,
+                SWP_NOZORDER);
+            InvalidateRect(hwnd, NULL, TRUE);
+        }
+        return 0;
+    }
+
+    case WM_KEYDOWN:
+        if (wParam == VK_RETURN)
+        {
+            if (d)
+            {
+                d->dontRemind = d->chkChecked;
+                d->result = 1;
+            }
+            DestroyWindow(hwnd);
+            return 0;
+        }
+        break;
+
     case WM_CLOSE:
         if (d) { d->result = 0; d->dontRemind = false; }
         DestroyWindow(hwnd);
@@ -450,7 +593,7 @@ static void show_update_dialog(UpdateDlgData &data)
     wc.hIconSm       = hIconSm;
     ATOM atom = RegisterClassExW(&wc);
 
-    const int WW = 370, WH = 200;
+    const int WW = Scale(370), WH = Scale(200);
     int x = (GetSystemMetrics(SM_CXSCREEN) - WW) / 2;
     int y = (GetSystemMetrics(SM_CYSCREEN) - WH) / 2;
 
@@ -479,6 +622,7 @@ static void show_update_dialog(UpdateDlgData &data)
 
     ShowWindow(hwnd, SW_SHOW);
     UpdateWindow(hwnd);
+    SetFocus(hwnd);
 
     MSG msg;
     while (GetMessageW(&msg, NULL, 0, 0) > 0)
@@ -496,6 +640,7 @@ static void show_update_dialog(UpdateDlgData &data)
 // RunUpdater
 extern "C" __declspec(dllexport) void RunUpdater()
 {
+    set_dpi_awareness();
     log_message("RunUpdater: starting");
     std::this_thread::sleep_for(std::chrono::milliseconds(2000));
 
