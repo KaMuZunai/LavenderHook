@@ -11,6 +11,8 @@
 #include <cmath>
 #include <vector>
 
+static float S() { return LavenderHook::Globals::menu_scale; }
+
 namespace {
     constexpr float kWindowWidth = 320.0f;
     constexpr float kExpandedWindowHeight = 520.0f;
@@ -113,6 +115,7 @@ namespace LavenderHook::UI::Windows {
 
         ImGui::PushStyleVar(ImGuiStyleVar_Alpha, g_fade.Alpha());
 
+        float s = S();
         const float rowHeight = std::round(ImGui::GetFrameHeight());
         int visibleCount = 0;
         float dropdownExtra = 0.0f;
@@ -123,7 +126,7 @@ namespace LavenderHook::UI::Windows {
             visibleCount++;
             int rows = 1;
             float rowHInt = std::round(rowHeight);
-            float spacingInt = std::round(kDropdownRowSpacing);
+            float spacingInt = std::round(kDropdownRowSpacing * s);
             float full = rows * rowHInt + (rows > 0 ? (rows - 1) * spacingInt : 0.0f);
             float t = EaseInOut(g_macroRowStates[i].dropdownAnim);
             if (t > 0.0f)
@@ -137,12 +140,12 @@ namespace LavenderHook::UI::Windows {
             }
         }
 
-        float totalItemSpacing = visibleCount > 0 ? (visibleCount - 1) * kRowSpacing : 0.0f;
-        float buttonRowsHeight = visibleCount * (rowHeight + kExtraHeightPerButton) + totalItemSpacing;
-        float contentHeight = buttonRowsHeight + dropdownExtra + rowHeight + kRowSpacing + 34.0f;
-        float windowHeight = kCollapsedWindowHeight + contentHeight * EaseInOut(g_managerHeaderAnim);
-        ImGui::SetNextWindowSize(ImVec2(kWindowWidth, windowHeight), ImGuiCond_Always);
-        ImGui::SetNextWindowSizeConstraints(ImVec2(kWindowWidth, kCollapsedWindowHeight), ImVec2(kWindowWidth, FLT_MAX));
+        float totalItemSpacing = visibleCount > 0 ? (visibleCount - 1) * kRowSpacing * s : 0.0f;
+        float buttonRowsHeight = visibleCount * (rowHeight + kExtraHeightPerButton * s) + totalItemSpacing;
+        float contentHeight = buttonRowsHeight + dropdownExtra + rowHeight + kRowSpacing * s + 34.0f * s;
+        float windowHeight = kCollapsedWindowHeight * s + contentHeight * EaseInOut(g_managerHeaderAnim);
+        ImGui::SetNextWindowSize(ImVec2(kWindowWidth * s, windowHeight), ImGuiCond_Always);
+        ImGui::SetNextWindowSizeConstraints(ImVec2(kWindowWidth * s, kCollapsedWindowHeight * s), ImVec2(kWindowWidth * s, FLT_MAX));
 
         ImGuiWindowFlags flags =
             ImGuiWindowFlags_NoResize |
@@ -168,6 +171,8 @@ namespace LavenderHook::UI::Windows {
             g_managerHeaderAnim,
             g_managerArrowAnim);
 
+        s = S();
+
         float target = g_managerHeaderOpen ? 1.0f : 0.0f;
         g_managerHeaderAnim += (target - g_managerHeaderAnim) * ImGui::GetIO().DeltaTime * 8.0f;
         g_managerHeaderAnim = g_managerHeaderAnim < 0.0f ? 0.0f : (g_managerHeaderAnim > 1.0f ? 1.0f : g_managerHeaderAnim);
@@ -187,7 +192,7 @@ namespace LavenderHook::UI::Windows {
                     continue;
 
                 auto& row = g_macroRowStates[i];
-                const float arrowWidth = 18.0f;
+                const float arrowWidth = 18.0f * s;
                 const float height = ImGui::GetFrameHeight();
                 const float width = ImGui::GetContentRegionAvail().x;
                 ImVec2 pos = ImGui::GetCursorScreenPos();
@@ -244,7 +249,7 @@ namespace LavenderHook::UI::Windows {
                     dl->AddLine(ImVec2(dividerX, pos.y + 4.0f), ImVec2(dividerX, pos.y + height - 4.0f), ImGui::GetColorU32(ImGuiCol_Border), borderSize);
                 }
 
-                dl->AddText(ImVec2(pos.x + 8.0f, pos.y + (height - ImGui::GetFontSize()) * 0.5f), ImGui::GetColorU32(ImGuiCol_Text), macro.name.c_str());
+                dl->AddText(ImVec2(pos.x + 8.0f * s, pos.y + (height - ImGui::GetFontSize()) * 0.5f), ImGui::GetColorU32(ImGuiCol_Text), macro.name.c_str());
 
                 if (g_dropLeftTex) {
                     float iconSize = height * 0.40f;
@@ -274,7 +279,7 @@ namespace LavenderHook::UI::Windows {
 
                 const float rowH = ImGui::GetFrameHeight();
                 const float rowHInt = std::round(rowH);
-                const float spacingInt = std::round(kDropdownRowSpacing);
+                const float spacingInt = std::round(kDropdownRowSpacing * s);
                 int rows = 1;
                 float full = rows * rowHInt + (rows > 0 ? (rows - 1) * spacingInt : 0.0f);
                 float tDropdown = EaseInOut(row.dropdownAnim);
@@ -298,7 +303,7 @@ namespace LavenderHook::UI::Windows {
                 float itemSpacing = childContainerHeight > 0.5f ? 0.0f : kDropdownClosedBuffer;
 
                     float savedCursorX = ImGui::GetCursorPosX();
-                    ImGui::Indent(12.0f);
+                    ImGui::Indent(12.0f * s);
                     ImGui::PushStyleVar(ImGuiStyleVar_Alpha, row.dropdownAnim * g_fade.Alpha() * EaseInOut(g_managerHeaderAnim));
                     ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0, 0, 0, 0));
                     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
@@ -312,12 +317,12 @@ namespace LavenderHook::UI::Windows {
                         macro.hotkey.keyVK = &macro.hotkeyVK;
 
                     float labelX = ImGui::GetCursorPosX();
-                    float controlX = labelX + 70.0f + 10.0f;
+                    float controlX = labelX + (70.0f + 10.0f) * s;
                     ImGui::AlignTextToFramePadding();
                     ImGui::TextUnformatted("Hotkey:");
                     ImGui::SameLine();
                     ImGui::SetCursorPosX(controlX);
-                    if (macro.hotkey.Render(ImVec2(120, ImGui::GetFrameHeight())))
+                    if (macro.hotkey.Render(ImVec2(120 * s, ImGui::GetFrameHeight())))
                         MarkMacrosDirty();
 
                     ImGui::EndChild();
@@ -325,7 +330,7 @@ namespace LavenderHook::UI::Windows {
                     ImGui::PopStyleVar();
                     ImGui::PopStyleVar();
                     ImGui::PopStyleColor();
-                    ImGui::Unindent(12.0f);
+                    ImGui::Unindent(12.0f * s);
                     ImGui::SetCursorPosX(savedCursorX);
                     ImGui::PopID();
                     ImGui::Dummy(ImVec2(0.0f, itemSpacing));

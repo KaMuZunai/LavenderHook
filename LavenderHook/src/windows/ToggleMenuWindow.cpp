@@ -39,8 +39,6 @@ static bool  expand_windows = false;
 static float s_windowsAnim = 0.0f;
 static float s_windowsArrowAnim = 0.0f;
 
-constexpr float kHideThreshold = 0.06f;
-
 static float Clamp01(float v)
 {
     return v < 0.0f ? 0.0f : (v > 1.0f ? 1.0f : v);
@@ -50,22 +48,14 @@ static float RowH() {
     return ImGui::GetFrameHeightWithSpacing();
 }
 
-static void AnimatedSectionBegin(
-    const char* id,
-    float anim,
-    float rowCount,
-    float parentAlpha)
-
+static void CollapsibleBegin(const char* id, float anim, float rowCount)
 {
-    if (anim <= 0.001f)
-        return;
-
     float rowH = ImGui::GetFrameHeightWithSpacing();
-    float height = rowH * rowCount * anim;
+    float fullHeight = rowH * rowCount;
+    constexpr float closedBuf = 4.0f;
+    float height = closedBuf + (fullHeight - closedBuf) * anim;
 
-    ImGui::PushStyleVar(ImGuiStyleVar_Alpha, anim * parentAlpha);
     ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0, 0, 0, 0));
-
     ImGui::BeginChild(
         ImGui::GetID(id),
         ImVec2(0.0f, height),
@@ -76,14 +66,15 @@ static void AnimatedSectionBegin(
     );
 }
 
-static void AnimatedSectionEnd(float anim)
+static void CollapsibleEnd()
 {
-    if (anim <= 0.001f)
-        return;
-
     ImGui::EndChild();
     ImGui::PopStyleColor();
-    ImGui::PopStyleVar();
+}
+
+static float ItemAlpha(float anim, float parentAlpha)
+{
+    return parentAlpha * Clamp01(anim * anim * (3.0f - 2.0f * anim));
 }
 
 static bool DropdownArrowCustom(
@@ -281,6 +272,7 @@ static void SaveMenuSettings()
     f << "show_process_overlay_on_hide=" << BoolToStr(LavenderHook::Globals::show_process_overlay_on_hide) << "\n";
     f << "show_wave_window=" << BoolToStr(LavenderHook::Globals::show_wave_window) << "\n";
     f << "sound_volume=" << LavenderHook::Globals::sound_volume << "\n";
+    f << "menu_scale=" << LavenderHook::Globals::menu_scale << "\n";
 }
 
 void LoadMenuSettings()
@@ -327,6 +319,11 @@ void LoadMenuSettings()
             if (eq != std::string::npos)
                 LavenderHook::Globals::sound_volume = std::stoi(line.substr(eq + 1));
         }
+        if (line.rfind("menu_scale", 0) == 0) {
+            size_t eq = line.find('=');
+            if (eq != std::string::npos)
+                LavenderHook::Globals::menu_scale = std::stof(line.substr(eq + 1));
+        }
     }
 }
 
@@ -368,7 +365,43 @@ void LoadPerfSettings()
 }
 
 static bool initialized_once = false;
+static bool s_styleCaptured = false;
+static ImGuiStyle s_baseStyle;
+static float s_prevScale = 1.0f;
+static float s_targetScale = 1.0f;
 static LavenderHook::UI::LavenderFadeOut g_menu_selector_fade;
+
+void InitMenuScale()
+{
+    s_baseStyle = ImGui::GetStyle();
+    s_styleCaptured = true;
+    s_targetScale = LavenderHook::Globals::menu_scale;
+    s_prevScale = s_targetScale;
+    ImGui::GetStyle().ScaleAllSizes(s_targetScale);
+    ImGui::GetIO().FontGlobalScale = s_targetScale;
+    ApplyThemeToImGui();
+}
+
+static void UpdateScaleAnimation()
+{
+    if (!s_styleCaptured)
+        return;
+    float& current = LavenderHook::Globals::menu_scale;
+    if (fabsf(current - s_targetScale) > 0.0005f)
+    {
+        current += (s_targetScale - current) * ImGui::GetIO().DeltaTime * 10.0f;
+        if (fabsf(current - s_targetScale) < 0.0005f)
+            current = s_targetScale;
+        if (fabsf(current - s_prevScale) > 0.001f)
+        {
+            s_prevScale = current;
+            ImGui::GetStyle() = s_baseStyle;
+            ImGui::GetStyle().ScaleAllSizes(current);
+            ImGui::GetIO().FontGlobalScale = current;
+            ApplyThemeToImGui();
+        }
+    }
+}
 
 // Window
 namespace LavenderHook {
@@ -383,45 +416,37 @@ namespace LavenderHook {
                 if (!g_menu_selector_fade.ShouldRender())
                     return;
 
+                UpdateScaleAnimation();
+
                 if (!initialized_once) {
                     initialized_once = true;
                     LoadTheme();
                     LoadMenuSettings();
                     LoadPerfSettings();
                     LavenderHook::Audio::SetVolumePercent(LavenderHook::Globals::sound_volume);
-                    ApplyThemeToImGui();
+                    if (!s_styleCaptured)
+                        InitMenuScale();
                 }
 
 
                 float alpha = g_menu_selector_fade.Alpha();
+                float s = LavenderHook::Globals::menu_scale;
 
-                const float headerHeight = 32.0f + 4.0f;
+                const float headerHeight = (32.0f + 4.0f) * s;
                 const float rowH = ImGui::GetFrameHeightWithSpacing();
 
-                // compute dynamic content height 
+                // compute dynamic content height (collapsible sections scale with anim)
                 float contentHeight = 0.0f;
 
-                // base options (Info Overlay, Stop on Fail, Process Overlay, Performance Overlay, Windows header)
-                contentHeight += 7 * rowH;
+                // always-visible items (14 + bottom pad)
+                contentHeight += 14 * rowH;
+                contentHeight += 3.5f * rowH;  // bottom padding
 
-                float perfLayoutT = (s_perfAnim > kHideThreshold) ? s_perfAnim : 0.0f;
-                contentHeight += 4 * rowH * perfLayoutT;
+                // collapsible sub-items
+                contentHeight += 4 * rowH * s_perfAnim;   // perf sub: FPS, RAM, CPU, GPU
+                contentHeight += 10 * rowH * s_windowsAnim; // windows sub: all toggles
 
-                float windowsLayoutT = (s_windowsAnim > kHideThreshold) ? s_windowsAnim : 0.0f;
-                contentHeight += 10 * rowH * windowsLayoutT;
-
-                // audio section
-                contentHeight += rowH; // separator/label
-                contentHeight += rowH; // slider
-
-
-                // theme section
-                contentHeight += rowH;       // separator + label
-                contentHeight += 3 * rowH;   // color pickers
-                contentHeight += rowH;       // reset button
-                contentHeight += 16.0f;      // padding
-
-                //  drive header animation 
+                // drive header animation 
                 float target = s_headerOpen ? 1.0f : 0.0f;
                 s_headerAnim += (target - s_headerAnim) * ImGui::GetIO().DeltaTime * 8.0f;
                 s_headerAnim = Clamp01(s_headerAnim);
@@ -437,13 +462,18 @@ namespace LavenderHook {
                 DriveAnim(s_perfAnim, expand_performance);
                 DriveAnim(s_windowsAnim, expand_windows);
 
-
-                // animated window height 
-                float animatedHeight =
+                // animated window height
+                float targetHeight =
                     headerHeight + contentHeight * s_headerAnim;
+                static float s_smoothHeight = 0.0f;
+                if (s_smoothHeight == 0.0f)
+                    s_smoothHeight = targetHeight;
+                s_smoothHeight += (targetHeight - s_smoothHeight) * ImGui::GetIO().DeltaTime * 20.0f;
+                if (fabsf(s_smoothHeight - targetHeight) < 0.5f)
+                    s_smoothHeight = targetHeight;
 
                 ImGui::SetNextWindowSize(
-                    ImVec2(350.0f, animatedHeight),
+                    ImVec2(351.0f * s, s_smoothHeight),
                     ImGuiCond_Always
                 );
 
@@ -476,76 +506,133 @@ namespace LavenderHook {
 
                 if (s_headerAnim > 0.001f)
                 {
-                    ImGui::PushStyleVar(
-                        ImGuiStyleVar_Alpha,
-                        alpha * s_headerAnim
-                    );
+                    float ha = alpha * s_headerAnim;
 
                     // Info Overlay
-                    bool b = LavenderHook::Globals::show_info_overlay;
-                    if (ImGui::Checkbox("Info Overlay", &b)) {
-                        LavenderHook::Globals::show_info_overlay = b;
-                        SaveMenuSettings();
-                        LavenderHook::Audio::PlayToggleSound(b);
-                    }
-
-                    // Stop on Fail
-                    if (ImGui::Checkbox("Stop on Fail", &LavenderHook::Globals::stop_on_fail)) {
-                        SaveMenuSettings();
-                        LavenderHook::Audio::PlayToggleSound(LavenderHook::Globals::stop_on_fail);
+                    {
+                        bool b = LavenderHook::Globals::show_info_overlay;
+                        if (ImGui::Checkbox("Info Overlay", &b)) {
+                            LavenderHook::Globals::show_info_overlay = b;
+                            SaveMenuSettings();
+                            LavenderHook::Audio::PlayToggleSound(b);
+                        }
                     }
 
                     // Process Overlay on Hide
-                    b = LavenderHook::Globals::show_process_overlay_on_hide;
-                    if (ImGui::Checkbox("Process Overlay on Hide", &b)) {
-                        LavenderHook::Globals::show_process_overlay_on_hide = b;
-                        SaveMenuSettings();
-                        LavenderHook::Audio::PlayToggleSound(b);
+                    {
+                        bool b = LavenderHook::Globals::show_process_overlay_on_hide;
+                        if (ImGui::Checkbox("Process Overlay on Hide", &b)) {
+                            LavenderHook::Globals::show_process_overlay_on_hide = b;
+                            SaveMenuSettings();
+                            LavenderHook::Audio::PlayToggleSound(b);
+                        }
+                    }
+
+                    // Stop on Fail
+                    {
+                        if (ImGui::Checkbox("Stop on Fail", &LavenderHook::Globals::stop_on_fail)) {
+                            SaveMenuSettings();
+                            LavenderHook::Audio::PlayToggleSound(LavenderHook::Globals::stop_on_fail);
+                        }
                     }
 
                     // Performance Overlay
-                    b = LavenderHook::Globals::show_performance_overlay;
-                    if (ImGui::Checkbox("Performance Overlay", &b)) {
-                        LavenderHook::Globals::show_performance_overlay = b;
-                        SavePerfSettings();
-                        LavenderHook::Audio::PlayToggleSound(b);
-                    }
-                    if (DropdownArrowCustom("perf", expand_performance, s_perfArrowAnim, alpha))
-                        expand_performance = !expand_performance;
-
-                    if (perfLayoutT > kHideThreshold)
                     {
-                        AnimatedSectionBegin("##perf_section", perfLayoutT, 4, alpha * s_headerAnim);
+                        bool b = LavenderHook::Globals::show_performance_overlay;
+                        if (ImGui::Checkbox("Performance Overlay", &b)) {
+                            LavenderHook::Globals::show_performance_overlay = b;
+                            SavePerfSettings();
+                            LavenderHook::Audio::PlayToggleSound(b);
+                        }
+                        if (DropdownArrowCustom("perf", expand_performance, s_perfArrowAnim, alpha))
+                            expand_performance = !expand_performance;
+
+                        CollapsibleBegin("##perf_section", s_perfAnim, 4);
                         ImGui::Indent(18.f);
 
-                        bool bP = LavenderHook::Globals::show_perf_fps;
-                        if (ImGui::Checkbox("FPS", &bP)) {
-                            LavenderHook::Globals::show_perf_fps = bP;
-                            SavePerfSettings();
-                            LavenderHook::Audio::PlayToggleSound(bP);
+                        float pa = ItemAlpha(s_perfAnim, ha);
+                        ImGui::PushStyleVar(ImGuiStyleVar_Alpha, pa);
+                        {
+                            bool bP = LavenderHook::Globals::show_perf_fps;
+                            if (ImGui::Checkbox("FPS", &bP)) {
+                                LavenderHook::Globals::show_perf_fps = bP;
+                                SavePerfSettings();
+                                LavenderHook::Audio::PlayToggleSound(bP);
+                            }
+                            bP = LavenderHook::Globals::show_perf_ram;
+                            if (ImGui::Checkbox("RAM Usage", &bP)) {
+                                LavenderHook::Globals::show_perf_ram = bP;
+                                SavePerfSettings();
+                                LavenderHook::Audio::PlayToggleSound(bP);
+                            }
+                            bP = LavenderHook::Globals::show_perf_cpu;
+                            if (ImGui::Checkbox("CPU Usage", &bP)) {
+                                LavenderHook::Globals::show_perf_cpu = bP;
+                                SavePerfSettings();
+                                LavenderHook::Audio::PlayToggleSound(bP);
+                            }
+                            bP = LavenderHook::Globals::show_perf_gpu;
+                            if (ImGui::Checkbox("GPU Usage", &bP)) {
+                                LavenderHook::Globals::show_perf_gpu = bP;
+                                SavePerfSettings();
+                                LavenderHook::Audio::PlayToggleSound(bP);
+                            }
                         }
-                        bP = LavenderHook::Globals::show_perf_ram;
-                        if (ImGui::Checkbox("RAM Usage", &bP)) {
-                            LavenderHook::Globals::show_perf_ram = bP;
-                            SavePerfSettings();
-                            LavenderHook::Audio::PlayToggleSound(bP);
+                        ImGui::PopStyleVar();
+                        ImGui::Unindent(18.f);
+                        CollapsibleEnd();
+                    }
+
+                    // Menu Scale
+                    ImGui::Separator();
+                    ImGui::TextDisabled("Menu Size:");
+                    ImGui::Indent(8.0f);
+                    ImGui::Spacing();
+                    {
+                        float cur = LavenderHook::Globals::menu_scale;
+                        float scaleWid = ImGui::GetContentRegionAvail().x * 0.9f;
+                        ImGui::SetNextItemWidth(scaleWid);
+                        float displayPct = cur * 100.0f;
+                        if (ImGui::SliderFloat("##menu_scale", &displayPct, 50.0f, 200.0f, "%.0f%%")) {
+                            s_targetScale = displayPct / 100.0f;
+                            float temp = LavenderHook::Globals::menu_scale;
+                            LavenderHook::Globals::menu_scale = s_targetScale;
+                            SaveMenuSettings();
+                            LavenderHook::Globals::menu_scale = temp;
                         }
-                        bP = LavenderHook::Globals::show_perf_cpu;
-                        if (ImGui::Checkbox("CPU Usage", &bP)) {
-                            LavenderHook::Globals::show_perf_cpu = bP;
-                            SavePerfSettings();
-                            LavenderHook::Audio::PlayToggleSound(bP);
-                        }
-                        bP = LavenderHook::Globals::show_perf_gpu;
-                        if (ImGui::Checkbox("GPU Usage", &bP)) {
-                            LavenderHook::Globals::show_perf_gpu = bP;
-                            SavePerfSettings();
-                            LavenderHook::Audio::PlayToggleSound(bP);
+                    }
+                    ImGui::Unindent(8.0f);
+
+                    // Audio section
+                    ImGui::Separator();
+                    ImGui::TextDisabled("Audio:");
+                    ImGui::Indent(8.0f);
+                    ImGui::Spacing();
+                    {
+                        int vol = LavenderHook::Globals::sound_volume;
+                        float wid = ImGui::GetContentRegionAvail().x * 0.9f;
+                        ImGui::SetNextItemWidth(wid);
+                        if (ImGui::SliderInt("##sound_volume", &vol, 0, 100, "%d%%")) {
+                            LavenderHook::Globals::sound_volume = vol;
+                            SaveMenuSettings();
+                            LavenderHook::Audio::SetVolumePercent(vol);
                         }
 
-                        ImGui::Unindent(18.f);
-                        AnimatedSectionEnd(perfLayoutT);
+                        bool mb = LavenderHook::Globals::mute_buttons;
+                        if (ImGui::Checkbox("Mute Button Clicks", &mb)) {
+                            LavenderHook::Globals::mute_buttons = mb;
+                            SaveMenuSettings();
+                            LavenderHook::Audio::PlayToggleSound(mb);
+                        }
+
+                        bool mf = LavenderHook::Globals::mute_fail;
+                        if (ImGui::Checkbox("Mute Stop on Fail", &mf)) {
+                            LavenderHook::Globals::mute_fail = mf;
+                            SaveMenuSettings();
+                            LavenderHook::Audio::PlayToggleSound(mf);
+                        }
                     }
+                    ImGui::Unindent(8.0f);
 
                     // Windows section
                     ImGui::Separator();
@@ -553,139 +640,62 @@ namespace LavenderHook {
                     if (DropdownArrowCustom("windows", expand_windows, s_windowsArrowAnim, alpha))
                         expand_windows = !expand_windows;
 
-                    if (windowsLayoutT > kHideThreshold)
+                    CollapsibleBegin("##windows_section", s_windowsAnim, 10);
+                    ImGui::Indent(18.f);
+
                     {
-                        AnimatedSectionBegin("##windows_section", windowsLayoutT, 10, alpha * s_headerAnim);
-                        ImGui::Indent(18.f);
+                        float wa = ItemAlpha(s_windowsAnim, ha);
+                        ImGui::PushStyleVar(ImGuiStyleVar_Alpha, wa);
 
-                        bool bW = LavenderHook::Globals::show_general_window;
-                        if (ImGui::Checkbox("General Window", &bW)) {
-                            LavenderHook::Globals::show_general_window = bW;
-                            SaveMenuSettings();
-                            LavenderHook::Audio::PlayToggleSound(bW);
-                        }
-                        bW = LavenderHook::Globals::show_misc_window;
-                        if (ImGui::Checkbox("Misc Window", &bW)) {
-                            LavenderHook::Globals::show_misc_window = bW;
-                            SaveMenuSettings();
-                            LavenderHook::Audio::PlayToggleSound(bW);
-                        }
-                        bW = LavenderHook::Globals::show_buffing_window;
-                        if (ImGui::Checkbox("Buffing Window", &bW)) {
-                            LavenderHook::Globals::show_buffing_window = bW;
-                            SaveMenuSettings();
-                            LavenderHook::Audio::PlayToggleSound(bW);
-                        }
-                        bW = LavenderHook::Globals::show_gamepad_window;
-                        if (ImGui::Checkbox("Virtual Controller", &bW)) {
-                            LavenderHook::Globals::show_gamepad_window = bW;
-                            SaveMenuSettings();
-                            LavenderHook::Audio::PlayToggleSound(bW);
-                        }
-                        bW = LavenderHook::Globals::show_profiles_window;
-                        if (ImGui::Checkbox("Profiles Window", &bW)) {
-                            LavenderHook::Globals::show_profiles_window = bW;
-                            SaveMenuSettings();
-                            LavenderHook::Audio::PlayToggleSound(bW);
-                        }
-                        bW = LavenderHook::Globals::show_macro_window;
-                        if (ImGui::Checkbox("Macro Manager", &bW)) {
-                            LavenderHook::Globals::show_macro_window = bW;
-                            SaveMenuSettings();
-                            LavenderHook::Audio::PlayToggleSound(bW);
-                        }
-                        bW = LavenderHook::Globals::show_paragon_level_window;
-                        if (ImGui::Checkbox("Mastery Level", &bW)) {
-                            LavenderHook::Globals::show_paragon_level_window = bW;
-                            SaveMenuSettings();
-                            LavenderHook::Audio::PlayToggleSound(bW);
-                        }
-                        bW = LavenderHook::Globals::show_wave_window;
-                        if (ImGui::Checkbox("Wave Overlay", &bW)) {
-                            LavenderHook::Globals::show_wave_window = bW;
-                            SaveMenuSettings();
-                            LavenderHook::Audio::PlayToggleSound(bW);
-                        }
-                        bW = LavenderHook::Globals::show_console;
-                        if (ImGui::Checkbox("Console", &bW)) {
-                            LavenderHook::Globals::show_console = bW;
-                            SaveMenuSettings();
-                            LavenderHook::Audio::PlayToggleSound(bW);
-                        }
-                        bW = LavenderHook::Globals::show_menu_logo;
-                        if (ImGui::Checkbox("Menu Logo", &bW)) {
-                            LavenderHook::Globals::show_menu_logo = bW;
-                            SaveMenuSettings();
-                            LavenderHook::Audio::PlayToggleSound(bW);
-                        }
-                        ImGui::Unindent(18.f);
-                        AnimatedSectionEnd(windowsLayoutT);
+                        auto WinCb = [&](const char* label, bool& var, const char* saveAfter = nullptr) {
+                            bool b = var;
+                            if (ImGui::Checkbox(label, &b)) {
+                                var = b;
+                                SaveMenuSettings();
+                                LavenderHook::Audio::PlayToggleSound(b);
+                            }
+                        };
+
+                        WinCb("General Window", LavenderHook::Globals::show_general_window);
+                        WinCb("Misc Window", LavenderHook::Globals::show_misc_window);
+                        WinCb("Buffing Window", LavenderHook::Globals::show_buffing_window);
+                        WinCb("Virtual Controller", LavenderHook::Globals::show_gamepad_window);
+                        WinCb("Profiles Window", LavenderHook::Globals::show_profiles_window);
+                        WinCb("Macro Manager", LavenderHook::Globals::show_macro_window);
+                        WinCb("Mastery Level", LavenderHook::Globals::show_paragon_level_window);
+                        WinCb("Wave Overlay", LavenderHook::Globals::show_wave_window);
+                        WinCb("Console", LavenderHook::Globals::show_console);
+                        WinCb("Menu Logo", LavenderHook::Globals::show_menu_logo);
+
+                        ImGui::PopStyleVar();
                     }
+                    ImGui::Unindent(18.f);
+                    CollapsibleEnd();
 
-                    // Audio Slider
-                    ImGui::Separator();
-                    ImGui::TextDisabled("Audio:");
-                    ImGui::Indent(8.0f);
-                    ImGui::Spacing();
-                    int vol = LavenderHook::Globals::sound_volume;
-                    float wid = ImGui::GetContentRegionAvail().x * 0.9f;
-                    ImGui::SetNextItemWidth(wid);
-                    if (ImGui::SliderInt("##sound_volume", &vol, 0, 100)) {
-                        LavenderHook::Globals::sound_volume = vol;
-                        SaveMenuSettings();
-                        LavenderHook::Audio::SetVolumePercent(vol);
-                    }
-
-					// Mute Buttons
-                    bool mb = LavenderHook::Globals::mute_buttons;
-                    if (ImGui::Checkbox("Mute Button Clicks", &mb)) {
-                        if (mb) {
-                            LavenderHook::Audio::PlayToggleSound(mb);
-                            LavenderHook::Globals::mute_buttons = mb;
-                            SaveMenuSettings();
-                        }
-                        else {
-                            LavenderHook::Globals::mute_buttons = mb;
-                            SaveMenuSettings();
-                            LavenderHook::Audio::PlayToggleSound(mb);
-                        }
-                    }
-
-					// Mute Stop on Fail
-                    bool mf = LavenderHook::Globals::mute_fail;
-                    if (ImGui::Checkbox("Mute Stop on Fail", &mf)) {
-                        LavenderHook::Globals::mute_fail = mf;
-                        SaveMenuSettings();
-                        LavenderHook::Audio::PlayToggleSound(mf);
-                    }
-
-                    ImGui::Unindent(8.0f);
-
+                    // Theme Colors
                     ImGui::Separator();
                     ImGui::TextDisabled("Theme Colors:");
 
-                    bool changed = false;
-
-                    if (ImGui::ColorEdit3("Main", (float*)&MAIN_RED)) changed = true;
-                    if (ImGui::ColorEdit3("Alt", (float*)&MID_RED))  changed = true;
-                    if (ImGui::ColorEdit3("Bright", (float*)&DARK_RED)) changed = true;
-
-                    if (changed) {
-                        SaveTheme();
-                        ApplyThemeToImGui();
-                    }
-
-
-                    if (ImGui::Button("Reset to Default"))
                     {
-                        MAIN_RED = DEF_MAIN_RED;
-                        MID_RED = DEF_MID_RED;
-                        DARK_RED = DEF_DARK_RED;
+                        bool changed = false;
+                        if (ImGui::ColorEdit3("Main", (float*)&MAIN_RED)) changed = true;
+                        if (ImGui::ColorEdit3("Alt", (float*)&MID_RED))  changed = true;
+                        if (ImGui::ColorEdit3("Bright", (float*)&DARK_RED)) changed = true;
 
-                        SaveTheme();
-                        ApplyThemeToImGui();
+                        if (changed) {
+                            SaveTheme();
+                            ApplyThemeToImGui();
+                        }
+
+                        if (ImGui::Button("Reset to Default"))
+                        {
+                            MAIN_RED = DEF_MAIN_RED;
+                            MID_RED = DEF_MID_RED;
+                            DARK_RED = DEF_DARK_RED;
+                            SaveTheme();
+                            ApplyThemeToImGui();
+                        }
                     }
-                    ImGui::PopStyleVar();
                 }
                 ImGui::End();
                 ImGui::PopStyleVar();

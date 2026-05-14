@@ -6,6 +6,7 @@
 #include "../ui/components/LavenderFadeOut.h"
 #include "../ui/components/LavenderWindowHeader.h"
 #include "../assets/UITextures.h"
+#include <algorithm>
 
 #include <cmath>
 #include <cstring>
@@ -91,8 +92,9 @@ static bool GpBtn(const char* id, const char* label, ImVec2 sz,
 }
 
 // Analog stick pad
-static void StickPad(const char* id, float& nx, float& ny,
-                     float size, bool shiftHeld, float drawAlpha)
+static bool StickPad(const char* id, float& nx, float& ny,
+                     float size, bool shiftHeld, float drawAlpha,
+                     bool& latched)
 {
     const ImVec2 sp = ImGui::GetCursorScreenPos();
     ImGui::InvisibleButton(id, ImVec2(size, size));
@@ -113,6 +115,11 @@ static void StickPad(const char* id, float& nx, float& ny,
     {
         nx = 0.f; ny = 0.f;
     }
+
+    if (ImGui::IsItemClicked(1))
+        latched = !latched;
+
+    bool pressed = latched;
 
     // Draw 
     ImDrawList* dl  = ImGui::GetWindowDrawList();
@@ -135,8 +142,9 @@ static void StickPad(const char* id, float& nx, float& ny,
     const float dotR = size * 0.12f;
 
     ImVec4 dv;
-    if      (active)                dv = ImVec4(MID_RED.x,  MID_RED.y,  MID_RED.z,  0.93f);
-    else if (nx != 0.f || ny != 0.f) dv = ImVec4(MAIN_RED.x, MAIN_RED.y, MAIN_RED.z, 0.80f);
+    if      (latched)              dv = ImVec4(MID_RED.x,  MID_RED.y,  MID_RED.z,  0.93f);
+    else if (active)               dv = ImVec4(MAIN_RED.x, MAIN_RED.y, MAIN_RED.z, 0.80f);
+    else if (nx != 0.f || ny != 0.f) dv = ImVec4(MAIN_RED.x, MAIN_RED.y, MAIN_RED.z, 0.70f);
     else                             dv = ImVec4(0.35f, 0.35f, 0.35f, 0.87f);
 
     const ImU32 dotFill = IM_COL32(
@@ -146,6 +154,8 @@ static void StickPad(const char* id, float& nx, float& ny,
         static_cast<int>(dv.w * drawAlpha * 255.f + 0.5f));
     dl->AddCircleFilled({dotX, dotY}, dotR, dotFill, 24);
     dl->AddCircle      ({dotX, dotY}, dotR, C(140, 140, 140, 0.55f), 24, 1.0f);
+
+    return pressed;
 }
 
 void GamepadWindow::Render(bool wantVisible)
@@ -230,19 +240,20 @@ void GamepadWindow::Render(bool wantVisible)
         s_headerAnim = GpClamp01(s_headerAnim);
     }
 
-    static constexpr float w       = 330.0f;
-    static constexpr float pad     = 8.0f;
-    static constexpr float btnSz   = 38.0f;
-    static constexpr float gap     = 5.0f;
-    static constexpr float stickSz = 76.0f;
+    float s = LavenderHook::Globals::menu_scale;
+    const float w       = 330.0f * s;
+    const float pad     = 8.0f * s;
+    const float btnSz   = 38.0f * s;
+    const float gap     = 5.0f * s;
+    const float stickSz = 76.0f * s;
     const  float rowH = btnSz + gap;
 
     const float bodyH = ImGui::GetFrameHeightWithSpacing()
-                      + rowH + 4.0f
+                      + rowH + 4.0f * s
                       + rowH * 3.0f + stickSz
-                      + 30.0f;
+                      + 30.0f * s;
 
-    ImGui::SetNextWindowSize(ImVec2(w, 36.0f + bodyH * s_headerAnim), ImGuiCond_Always);
+    ImGui::SetNextWindowSize(ImVec2(w, 36.0f * s + bodyH * s_headerAnim), ImGuiCond_Always);
     ImGui::SetNextWindowPos(ImVec2(400.f, 60.f), ImGuiCond_FirstUseEver);
     ImGui::PushStyleVar(ImGuiStyleVar_Alpha, alpha);
 
@@ -262,6 +273,8 @@ void GamepadWindow::Render(bool wantVisible)
 
     RenderWindowHeader("Virtual Controller", g_zapIcoTex, g_dropLeftTex,
         w, alpha, s_headerOpen, s_headerAnim, s_arrowAnim);
+
+    s = LavenderHook::Globals::menu_scale;
 
     if (s_headerAnim > 0.001f)
     {
@@ -283,7 +296,7 @@ void GamepadWindow::Render(bool wantVisible)
             ImGui::TextColored(statusCol, "%s", statusText.c_str());
         }
         {
-            static constexpr float btnW = 120.0f;
+            float btnW = 120.0f * s;
             ImGui::SameLine();
             ImGui::SetCursorPosX(w - pad - btnW);
             if (initing) {
@@ -311,6 +324,8 @@ void GamepadWindow::Render(bool wantVisible)
             ImGui::SetCursorPosY(savedY);
         }
 
+        s = LavenderHook::Globals::menu_scale;
+
         // Shift latch bookkeepin
         const bool shiftHeld = ImGui::GetIO().KeyShift;
         if (!shiftHeld && s_prevShift)
@@ -323,7 +338,7 @@ void GamepadWindow::Render(bool wantVisible)
         // Controller layout
         const float drawAlpha = alpha * s_headerAnim;
         const ImVec2 bsz(btnSz, btnSz);
-        const float backBtnW = btnSz + 18.0f;
+        const float backBtnW = btnSz + 18.0f * s;
 
         const int iLB = GPVK_LB        - GPVK_BASE, iLT = GPVK_LT        - GPVK_BASE;
         const int iRT = GPVK_RT        - GPVK_BASE, iRB = GPVK_RB        - GPVK_BASE;
@@ -332,6 +347,7 @@ void GamepadWindow::Render(bool wantVisible)
         const int iY  = GPVK_Y - GPVK_BASE, iX = GPVK_X - GPVK_BASE;
         const int iA  = GPVK_A - GPVK_BASE, iB = GPVK_B - GPVK_BASE;
         const int iBK = GPVK_BACK  - GPVK_BASE, iST = GPVK_START - GPVK_BASE;
+        const int iLS = GPVK_LS    - GPVK_BASE, iRS = GPVK_RS    - GPVK_BASE;
 
         const float dpadL  = pad;
         const float dpadCX = pad + rowH;
@@ -366,11 +382,11 @@ void GamepadWindow::Render(bool wantVisible)
 
         // Left stick
         ImGui::SetCursorPos({dpadL, lsY});
-        StickPad("LS_pad", s_lsx, s_lsy, stickSz, shiftHeld, drawAlpha);
+        bool hLS = StickPad("LS_pad", s_lsx, s_lsy, stickSz, shiftHeld, drawAlpha, s_latch[iLS]);
 
         // Right stick
         ImGui::SetCursorPos({rsX, lsY});
-        StickPad("RS_pad", s_rsx, s_rsy, stickSz, shiftHeld, drawAlpha);
+        bool hRS = StickPad("RS_pad", s_rsx, s_rsy, stickSz, shiftHeld, drawAlpha, s_latch[iRS]);
 
         // Back / Start
         ImGui::SetCursorPos({backX,  bkStY}); hBk = GpBtn("BACK",  "Back",  {backBtnW, btnSz}, s_latch[iBK], shiftHeld, iBK);
@@ -416,6 +432,8 @@ void GamepadWindow::Render(bool wantVisible)
             SetButton(GPVK_B,          hB);
             SetButton(GPVK_BACK,       hBk);
             SetButton(GPVK_START,      hSt);
+            SetButton(GPVK_LS,         hLS);
+            SetButton(GPVK_RS,         hRS);
             SetThumb(true,  s_lsx, s_lsy);
             SetThumb(false, s_rsx, s_rsy);
             Update();

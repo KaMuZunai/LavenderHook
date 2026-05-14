@@ -26,10 +26,11 @@ namespace LavenderHook {
 
                 const float alpha = g_fade.Alpha();
 
-                const ImVec2 size(180.0f, 28.0f);
+                float s = LavenderHook::Globals::menu_scale;
+                const ImVec2 size(180.0f * s, 28.0f * s);
                 const float margin = 14.0f;
                 const float gap_up = 8.0f;
-                const float round = 6.0f;
+                const float round = 6.0f * s;
 
                 ImGuiIO& io = ImGui::GetIO();
                 const ImVec2 pos(
@@ -54,22 +55,24 @@ namespace LavenderHook {
 
                 ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
                 ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+                ImGui::PushStyleVar(ImGuiStyleVar_WindowMinSize, ImVec2(0, 0));
                 ImGui::PushStyleVar(ImGuiStyleVar_Alpha, alpha);
 
                 if (!ImGui::Begin("##AH_MenuSelectorBtn", nullptr, flags)) {
                     ImGui::End();
-                    ImGui::PopStyleVar(3);
+                    ImGui::PopStyleVar(4);
                     return;
                 }
 
                 ImDrawList* dl = ImGui::GetWindowDrawList();
+                ImVec2 winSize = ImGui::GetWindowSize();
                 ImVec2 p0 = ImGui::GetCursorScreenPos();
-                ImVec2 p1 = ImVec2(p0.x + size.x, p0.y + size.y);
+                ImVec2 p1 = ImVec2(p0.x + winSize.x, p0.y + winSize.y);
 
                 if (alpha < 0.98f)
                     ImGui::BeginDisabled();
 
-                ImGui::InvisibleButton("##menusel_btn", size);
+                ImGui::InvisibleButton("##menusel_btn", winSize);
                 if (ImGui::IsItemClicked(0))
                     LavenderHook::Globals::show_menu_selector_window =
                     !LavenderHook::Globals::show_menu_selector_window;
@@ -109,10 +112,10 @@ namespace LavenderHook {
                 }
 
 
-                float innerW = size.x - 2.0f;
+                float innerW = winSize.x - 2.0f;
                 float fillW = innerW * anim;
 
-                float cx = p0.x + size.x * 0.5f;
+                float cx = p0.x + winSize.x * 0.5f;
                 float left = cx - fillW * 0.5f;
                 float right = cx + fillW * 0.5f;
 
@@ -127,12 +130,12 @@ namespace LavenderHook {
 
                 const char* label = "Settings";
                 ImVec2 ts = ImGui::CalcTextSize(label);
-                ImVec2 tc(cx - ts.x * 0.5f, p0.y + (size.y - ts.y) * 0.5f);
+                ImVec2 tc(cx - ts.x * 0.5f, p0.y + (winSize.y - ts.y) * 0.5f);
 
                 dl->AddText(tc, IM_COL32(255, 255, 255, (int)(255.0f * alpha)), label);
 
                 ImGui::End();
-                ImGui::PopStyleVar(3);
+                ImGui::PopStyleVar(4);
             }
 
         }

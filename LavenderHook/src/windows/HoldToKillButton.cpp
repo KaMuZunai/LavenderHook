@@ -88,9 +88,10 @@ namespace LavenderHook {
 
                 const float alpha = g_fade.Alpha();
 
-                const ImVec2 size(180.f, 28.f);
+                float s = LavenderHook::Globals::menu_scale;
+                const ImVec2 size(180.f * s, 28.f * s);
                 const float margin = 14.f;
-                const float round = 6.f;
+                const float round = 6.f * s;
 
                 const float chargeTime = 2.f;
                 const float drainTime = 1.f;
@@ -106,13 +107,14 @@ namespace LavenderHook {
                     }
                 }
 
-                ImGuiViewport* vp = ImGui::GetMainViewport();
+                ImGuiIO& io = ImGui::GetIO();
                 ImVec2 anchor(
-                    vp->WorkPos.x + vp->WorkSize.x - margin,
-                    vp->WorkPos.y + vp->WorkSize.y - margin
+                    io.DisplaySize.x - margin,
+                    io.DisplaySize.y - margin
                 );
 
                 ImGui::SetNextWindowPos(anchor, ImGuiCond_Always, ImVec2(1.f, 1.f));
+                ImGui::SetNextWindowSize(size, ImGuiCond_Always);
 
                 const ImGuiWindowFlags flags =
                     ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoScrollbar |
@@ -123,27 +125,29 @@ namespace LavenderHook {
 
                 ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.f);
                 ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+                ImGui::PushStyleVar(ImGuiStyleVar_WindowMinSize, ImVec2(0, 0));
                 ImGui::PushStyleVar(ImGuiStyleVar_Alpha, alpha);
 
                 if (!ImGui::Begin("##AH_KillSwitch", nullptr, flags)) {
                     ImGui::End();
-                    ImGui::PopStyleVar(3);
+                    ImGui::PopStyleVar(4);
                     return;
                 }
 
                 ImDrawList* dl = ImGui::GetWindowDrawList();
+                ImVec2 winSize = ImGui::GetWindowSize();
                 ImVec2 p0 = ImGui::GetCursorScreenPos();
-                ImVec2 p1 = ImVec2(p0.x + size.x, p0.y + size.y);
+                ImVec2 p1 = ImVec2(p0.x + winSize.x, p0.y + winSize.y);
 
                 if (alpha < 0.98f)
                     ImGui::BeginDisabled();
 
-                ImGui::InvisibleButton("##hold_kill_btn", size);
+                ImGui::InvisibleButton("##hold_kill_btn", winSize);
 
                 bool hovered = ImGui::IsItemHovered();
                 bool held = hovered && ImGui::IsMouseDown(0);
 
-                float dt = ImGui::GetIO().DeltaTime;
+                float dt = io.DeltaTime;
 
                 rawProgress += held ? (dt / chargeTime) : -(dt / drainTime);
                 rawProgress = std::clamp(rawProgress, 0.f, 1.f);
@@ -187,8 +191,8 @@ namespace LavenderHook {
 
                 if (easedProgress > 0.f)
                 {
-                    float center = p0.x + size.x * 0.5f;
-                    float halfFill = (size.x * 0.5f) * easedProgress;
+                    float center = p0.x + winSize.x * 0.5f;
+                    float halfFill = (winSize.x * 0.5f) * easedProgress;
 
                     ImVec2 f0(center - halfFill, p0.y);
                     ImVec2 f1(center + halfFill, p1.y);
@@ -198,11 +202,11 @@ namespace LavenderHook {
 
                 const char* label = held ? "EXITING..." : "EXIT";
                 ImVec2 ts = ImGui::CalcTextSize(label);
-                ImVec2 tc(p0.x + (size.x - ts.x) * 0.5f, p0.y + (size.y - ts.y) * 0.5f);
+                ImVec2 tc(p0.x + (winSize.x - ts.x) * 0.5f, p0.y + (winSize.y - ts.y) * 0.5f);
                 dl->AddText(tc, col_text, label);
 
                 ImGui::End();
-                ImGui::PopStyleVar(3);
+                ImGui::PopStyleVar(4);
             }
 
         }

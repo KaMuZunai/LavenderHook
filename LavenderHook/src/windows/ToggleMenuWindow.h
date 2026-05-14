@@ -21,3 +21,5 @@ namespace LavenderHook {
         } // Windows
     } // UI
 } // LavenderHook
+
+void InitMenuScale();

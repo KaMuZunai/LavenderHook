@@ -161,8 +161,9 @@ namespace LavenderHook::UI::Windows {
             ImGuiWindowFlags_NoBackground |
             ImGuiWindowFlags_AlwaysAutoResize;
 
-        ImGui::SetNextWindowPos(ImVec2(10, 10), ImGuiCond_Always);
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(6, 6));
+        float s = LavenderHook::Globals::menu_scale;
+        ImGui::SetNextWindowPos(ImVec2(10 * s, 10 * s), ImGuiCond_Always);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(6 * s, 6 * s));
         ImGui::PushStyleVar(ImGuiStyleVar_Alpha, winAlpha);
 
         if (!ImGui::Begin("PerformanceOverlay", nullptr, flags))

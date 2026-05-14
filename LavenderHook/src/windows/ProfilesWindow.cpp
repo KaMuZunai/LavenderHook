@@ -323,11 +323,12 @@ void ProfilesWindow::Render(bool wantVisible)
         s_headerAnim  = Clamp01(s_headerAnim);
     }
 
-    static constexpr float kWidth   = 290.f;
-    static constexpr float kRowH    = 32.f;
-    static constexpr float kSpacing = 4.f;
-    static constexpr float kPad     = 8.f;
-    static constexpr float kHeaderH = 36.f;
+    float s = LavenderHook::Globals::menu_scale;
+    const float kWidth   = 290.f * s;
+    const float kRowH    = 32.f * s;
+    const float kSpacing = 4.f * s;
+    const float kPad     = 8.f * s;
+    const float kHeaderH = 36.f * s;
 
     const int   nProfiles = static_cast<int>(g_profiles.size());
     const float rowStep   = kRowH + kSpacing;
@@ -367,10 +368,10 @@ void ProfilesWindow::Render(bool wantVisible)
         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4.f, kSpacing));
 
         const float innerW   = kWidth - ImGui::GetStyle().WindowPadding.x * 2.f;
-        const float xBtnW    = 22.f;
-        const float renBtnW  = 22.f;
-        const float hkBtnW   = 50.f;
-        const float btnGap   = 4.f;
+        const float xBtnW    = 22.f * s;
+        const float renBtnW  = 22.f * s;
+        const float hkBtnW   = 50.f * s;
+        const float btnGap   = 4.f * s;
         const float nameBtnW = innerW - hkBtnW - btnGap - renBtnW - btnGap - xBtnW - btnGap;
 
         bool triggerConfirm = false;

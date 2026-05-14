@@ -41,7 +41,7 @@ static LPVOID FindXInputGetState()
 
 // XInput user index
 static constexpr DWORD kVigemTargetSlot = 1;
-
+static DWORD g_frozen_packet[XUSER_MAX_COUNT] = {};
 static DWORD WINAPI hkXInputGetState(DWORD dwUserIndex, XINPUT_STATE* pState)
 {
     const bool ourQuery = LavenderHook::Globals::xinput_our_query;
@@ -61,6 +61,8 @@ static DWORD WINAPI hkXInputGetState(DWORD dwUserIndex, XINPUT_STATE* pState)
                     !LavenderHook::Input::VGamepad::AutomationActive())
                 {
                     ZeroMemory(&pState->Gamepad, sizeof(pState->Gamepad));
+                    if (dwUserIndex < XUSER_MAX_COUNT)
+                        pState->dwPacketNumber = g_frozen_packet[dwUserIndex];
                 }
                 return result;
             }
@@ -80,6 +82,8 @@ static DWORD WINAPI hkXInputGetState(DWORD dwUserIndex, XINPUT_STATE* pState)
         !LavenderHook::Input::VGamepad::AutomationActive())
     {
         ZeroMemory(&pState->Gamepad, sizeof(pState->Gamepad));
+        if (dwUserIndex < XUSER_MAX_COUNT)
+            pState->dwPacketNumber = g_frozen_packet[dwUserIndex];
     }
     return result;
 }
@@ -172,7 +176,7 @@ LRESULT CALLBACK LavenderHook::Hooks::WndProc::HookedWndProc(HWND hwnd, UINT msg
     // Toggle menu on Insert OR Ctrl + F1
     if (msg == WM_KEYDOWN &&
         (wparam == VK_INSERT ||
-         (wparam == VK_F1 && (GetAsyncKeyState(VK_CONTROL) & 0x8000))))
+            (wparam == VK_F1 && (GetAsyncKeyState(VK_CONTROL) & 0x8000))))
     {
         LavenderHook::Globals::show_menu = !LavenderHook::Globals::show_menu;
         return 1;

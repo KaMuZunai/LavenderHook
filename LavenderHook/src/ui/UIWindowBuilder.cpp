@@ -4,6 +4,7 @@
 #include "../imgui/imgui_internal.h"
 #include "../assets/UITextures.h"
 #include "../windows/ToggleMenuWindow.h"
+#include "../misc/Globals.h"
 #include "GUI.h"
 #include "../sound/SoundPlayer.h"
 #include <cmath>
@@ -11,6 +12,8 @@
 constexpr float kDropdownArrowInset = 6.0f;   // left
 constexpr float kDropdownArrowScale = 0.40f;
 constexpr float kDropdownRowSpacing = 2.0f;
+
+static float Scale(float v) { return v * LavenderHook::Globals::menu_scale; }
 
 using namespace LavenderHook::UI;
 using namespace LavenderHook::UI::Lavender;
@@ -33,6 +36,8 @@ namespace {
     constexpr float kTimingControlX =
         kTimingLabelWidth + 10.0f; // padding between label and control
 }
+
+
 
 UIWindowBuilder& UIWindowBuilder::AddItemDescription(const char* description)
 {
@@ -217,11 +222,12 @@ UIWindowBuilder& UIWindowBuilder::SetHeaderIcon(ImTextureID icon)
 
 float UIWindowBuilder::ComputeHeight() const
 {
-    float height = kBaseHeight;
+    float s = Scale(1.0f);
+    float height = kBaseHeight * s;
 
     for (const auto& it : m_items)
     {
-        height += kRowHeight;
+        height += kRowHeight * s;
 
         if (it.type == UIItemType::ToggleDropdown)
         {
@@ -232,7 +238,7 @@ float UIWindowBuilder::ComputeHeight() const
 
             float rowH = ImGui::GetFrameHeight();
             float rowHInt = std::round(rowH);
-            float spacingInt = std::round(kDropdownRowSpacing);
+            float spacingInt = std::round(kDropdownRowSpacing * s);
             float full = rows * rowHInt + (rows > 0 ? (rows - 1) * spacingInt : 0.0f);
             float t = EaseInOut(it.dropdownAnim);
             float fullInt = std::round(full); 
@@ -254,10 +260,10 @@ float UIWindowBuilder::ComputeHeight() const
 
             float layoutRounded = (!nit.dropdownOpen) ? std::ceil(nit.layoutHeight) : std::round(nit.layoutHeight);
             layoutRounded = std::min(layoutRounded, fullInt);
-            float closedBufInt = std::round(kDropdownClosedBuffer);
+            float closedBufInt = std::round(kDropdownClosedBuffer * s);
             if (nit.dropdownAnim > 0.001f || nit.dropdownOpen) {
                 // flat negative pixel offset
-                float reduced = layoutRounded - kDropdownExpansionOffset;
+                float reduced = layoutRounded - kDropdownExpansionOffset * s;
                 if (reduced < closedBufInt)
                     reduced = closedBufInt;
                 if (reduced < 0.0f)
@@ -324,14 +330,15 @@ void UIWindowBuilder::Render(bool wantVisible)
         it.arrowAnim = ImClamp(it.arrowAnim, 0.0f, 1.0f);
     }
 
+    float s = Scale(1.0f);
     float fullHeight = ComputeHeight();
-    float collapsedHeight = 32.0f + 6.0f;
+    float collapsedHeight = (32.0f + 6.0f) * s;
 
     float animatedHeight =
         collapsedHeight + (fullHeight - collapsedHeight) * eased;
 
     ImGui::SetNextWindowSize(
-        ImVec2(m_width, animatedHeight),
+        ImVec2(m_width * s, animatedHeight),
         ImGuiCond_Always
     );
 
@@ -351,10 +358,10 @@ void UIWindowBuilder::Render(bool wantVisible)
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
 
     // header
-    const float headerHeight = 32.0f;
-    const float arrowWidth = 26.0f;
-    const float iconSize = 18.0f;
-    const float padding = 8.0f;
+    const float headerHeight = 32.0f * s;
+    const float arrowWidth = 26.0f * s;
+    const float iconSize = 18.0f * s;
+    const float padding = 8.0f * s;
 
     ImVec2 winPos = ImGui::GetWindowPos();
     ImVec2 winSize = ImGui::GetWindowSize();
@@ -525,7 +532,7 @@ void UIWindowBuilder::Render(bool wantVisible)
                     int hkBackup = it.hotkeyVK ? *it.hotkeyVK : 0;
 
                     bool before = it.toggle ? *it.toggle : false;
-                    ToggleButton(it.label, it.toggle, ImVec2(kToggleWidth, 0));
+                    ToggleButton(it.label, it.toggle, ImVec2(kToggleWidth * s, 0));
                     bool after = it.toggle ? *it.toggle : false;
                     if (before != after) LavenderHook::Audio::PlayToggleSound(after);
                     ImGui::SameLine();
@@ -533,7 +540,7 @@ void UIWindowBuilder::Render(bool wantVisible)
                     bool hkChanged = false;
                     if (it.hotkeyIndex >= 0)
                         hkChanged = m_hotkeys[it.hotkeyIndex]
-                        .Render(ImVec2(kHotkeyWidth, ImGui::GetFrameHeight()));
+                        .Render(ImVec2(kHotkeyWidth * s, ImGui::GetFrameHeight()));
 
                     if (!hkChanged && it.hotkeyVK)
                         *it.hotkeyVK = hkBackup;
@@ -544,7 +551,7 @@ void UIWindowBuilder::Render(bool wantVisible)
                 {
                     ImGui::PushID(&it);
 
-                    const float arrowWidth = 18.0f;
+                    const float arrowWidth = 18.0f * s;
                     const float height = ImGui::GetFrameHeight();
                     const float width = ImGui::GetContentRegionAvail().x;
 
@@ -627,7 +634,7 @@ void UIWindowBuilder::Render(bool wantVisible)
                     }
 
                     dl->AddText(
-                        ImVec2(pos.x + 8.0f,
+                        ImVec2(pos.x + 8.0f * s,
                             pos.y + (height - ImGui::GetFontSize()) * 0.5f),
                         ImGui::GetColorU32(ImGuiCol_Text),
                         it.label
@@ -709,14 +716,14 @@ void UIWindowBuilder::Render(bool wantVisible)
 
                     float rowH = ImGui::GetFrameHeight();
                     float rowHInt = std::round(rowH);
-                    float spacingInt = std::round(kDropdownRowSpacing);
+                    float spacingInt = std::round(kDropdownRowSpacing * s);
                     float fullHeight = rows * rowHInt + (rows > 0 ? (rows - 1) * spacingInt : 0.0f);
                     float childHeight = it.layoutHeight;
                     float childHeightRounded = (!it.dropdownOpen) ? std::ceil(childHeight) : std::round(childHeight);
                     childHeightRounded = std::min(childHeightRounded, fullHeight);
-                    float closedBufInt = std::round(kDropdownClosedBuffer);
+                    float closedBufInt = std::round(kDropdownClosedBuffer * s);
 
-                    ImGui::Indent(12.0f);
+                    ImGui::Indent(12.0f * s);
 
                     ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0, 0, 0, 0));
                     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
@@ -756,7 +763,7 @@ void UIWindowBuilder::Render(bool wantVisible)
                         };
 
                     const float labelX = ImGui::GetCursorPosX();
-                    const float controlX = labelX + kTimingControlX;
+                    const float controlX = labelX + kTimingControlX * s;
 
                     if (it.hotkeyIndex >= 0) {
                         float a = RowAlpha(visualIndex++) * finalAlpha;
@@ -768,7 +775,7 @@ void UIWindowBuilder::Render(bool wantVisible)
                             ImGui::SameLine();
                             ImGui::SetCursorPosX(controlX);
                             m_hotkeys[it.hotkeyIndex]
-                                .Render(ImVec2(kHotkeyWidth, ImGui::GetFrameHeight()));
+                                .Render(ImVec2(kHotkeyWidth * s, ImGui::GetFrameHeight()));
                             ImGui::PopStyleVar();
                             ImGui::SetCursorPosY(rowStartY + rowHInt);
                             // add spacing between rows but not after last row
@@ -793,13 +800,13 @@ void UIWindowBuilder::Render(bool wantVisible)
                                 if (tr.hotkeyVK) {
                                     // make sure hotkey instance is bound to the correct storage
                                     tr.hotkey.keyVK = tr.hotkeyVK;
-                                    bool hkChanged = tr.hotkey.Render(ImVec2(kHotkeyWidth, ImGui::GetFrameHeight()));
+                                    bool hkChanged = tr.hotkey.Render(ImVec2(kHotkeyWidth * s, ImGui::GetFrameHeight()));
                                     if (hkChanged)
                                         *tr.hotkeyVK = *tr.hotkey.keyVK;
                                 }
                             }
                             else {
-                                ImGui::SetNextItemWidth(kTimingSliderWidth);
+                                ImGui::SetNextItemWidth(kTimingSliderWidth * s);
                                 if (tr.asIntInput) {
                                     ImGui::InputInt(
                                         ("##" + std::string(tr.label)).c_str(),
@@ -847,7 +854,7 @@ void UIWindowBuilder::Render(bool wantVisible)
                     ImGui::PopStyleVar();
                     ImGui::PopStyleVar();
                     ImGui::PopStyleColor();
-                    ImGui::Unindent(12.0f);
+                    ImGui::Unindent(12.0f * s);
 
                     // Tooltip
                     bool rightDown = ImGui::IsMouseDown(1);
@@ -918,7 +925,7 @@ void UIWindowBuilder::Render(bool wantVisible)
                     break;
 
                 case UIItemType::Button:
-                    if (Button(it.label, ImVec2(kButtonWidth, 0)) && it.onClick)
+                    if (Button(it.label, ImVec2(kButtonWidth * s, 0)) && it.onClick)
                         it.onClick();
                     break;
                 }

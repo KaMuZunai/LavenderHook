@@ -222,7 +222,6 @@ void Press(int gpvk)
 bool AutomationActive()
 {
     if (!s_available.load()) return false;
-    std::lock_guard<std::mutex> lock(s_report_mutex);
     return s_report.wButtons != 0 ||
            s_report.bLeftTrigger != 0 ||
            s_report.bRightTrigger != 0;

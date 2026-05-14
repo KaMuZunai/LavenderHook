@@ -4,6 +4,7 @@
 #include <Xinput.h>
 #include <string>
 #include "../misc/Globals.h"
+#include "../imgui/imgui.h"
 
 namespace LavenderHook::UI::Lavender {
 
@@ -84,15 +85,27 @@ namespace LavenderHook::UI::Lavender {
     // Returns true if the gamepad VK is pressed on any connected XInput controller.
     inline bool GetGamepadVkDown(int vk)
     {
+        static XINPUT_STATE s_state[XUSER_MAX_COUNT];
+        static bool s_connected[XUSER_MAX_COUNT];
+        static int s_lastFrame = -1;
+
+        int frame = ImGui::GetFrameCount();
+        if (frame != s_lastFrame)
+        {
+            s_lastFrame = frame;
+            for (DWORD i = 0; i < XUSER_MAX_COUNT; ++i)
+            {
+                LavenderHook::Globals::xinput_our_query = true;
+                DWORD result = XInputGetState(i, &s_state[i]);
+                LavenderHook::Globals::xinput_our_query = false;
+                s_connected[i] = (result == ERROR_SUCCESS);
+            }
+        }
+
         for (DWORD i = 0; i < XUSER_MAX_COUNT; ++i)
         {
-            XINPUT_STATE state{};
-            LavenderHook::Globals::xinput_our_query = true;
-            DWORD result = XInputGetState(i, &state);
-            LavenderHook::Globals::xinput_our_query = false;
-            if (result != ERROR_SUCCESS)
-                continue;
-            const XINPUT_GAMEPAD& gp = state.Gamepad;
+            if (!s_connected[i]) continue;
+            const XINPUT_GAMEPAD& gp = s_state[i].Gamepad;
             switch (vk)
             {
                 case GPVK_DPAD_UP:    if (gp.wButtons & XINPUT_GAMEPAD_DPAD_UP)            return true; break;

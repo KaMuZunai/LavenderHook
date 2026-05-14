@@ -53,6 +53,9 @@ namespace LavenderHook::Globals
     // video overlay
     inline bool show_process_overlay_on_hide = false;
 
+    // UI scale multiplier
+    inline float menu_scale = 1.0f;
+
     // Sound volume percentage
     inline int sound_volume = 100;
 	inline bool mute_buttons = false;

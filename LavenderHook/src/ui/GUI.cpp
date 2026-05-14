@@ -129,6 +129,7 @@ static std::string GetFileVersionString()
 extern bool LoadTheme();
 extern void ApplyThemeToImGui();
 extern void LoadMenuSettings();
+extern void InitMenuScale();
 namespace LavenderHook::UI::Windows {
     void LoadPerfSettings();
 }
@@ -308,6 +309,8 @@ GUI::GUI()
         io.Fonts->AddFontFromFileTTF(fontPath.c_str(), 24.0f);
         fontLoaded = true;
     }
+
+    InitMenuScale();
 }
 
 static bool LoadTextureFromResource(int resId, Texture& outTex, ImTextureID& outId)

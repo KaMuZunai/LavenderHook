@@ -1,5 +1,6 @@
 #include "LavenderWindowHeader.h"
 #include "../../imgui/imgui_internal.h"
+#include "../../misc/Globals.h"
 #include <cmath>
 
 // Theme color
@@ -44,10 +45,11 @@ namespace LavenderHook::UI::Lavender {
         float& headerAnim,
         float& arrowAnim)
     {
-        const float headerHeight = 32.0f;
-        const float arrowWidth = 26.0f;
-        const float iconSize = 18.0f;
-        const float padding = 8.0f;
+    float sc = LavenderHook::Globals::menu_scale;
+    const float headerHeight = 32.0f * sc;
+    const float arrowWidth = 26.0f * sc;
+    const float iconSize = 18.0f * sc;
+    const float padding = 8.0f * sc;
 
         ImVec2 winPos = ImGui::GetWindowPos();
         ImDrawList* dl = ImGui::GetWindowDrawList();
@@ -171,7 +173,7 @@ namespace LavenderHook::UI::Lavender {
             );
         }
 
-        ImGui::Dummy(ImVec2(0.0f, 4.0f));
+        ImGui::Dummy(ImVec2(0.0f, 4.0f * sc));
         return headerOpen;
     }
 
