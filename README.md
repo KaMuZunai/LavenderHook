@@ -46,22 +46,60 @@ Press **Insert** or **CTRL + F1** to open the overlay menu.
 Force closes the game when held long enough.\
 Note: It will **NOT** cause the game to save the data before closing.
 
+## Travel to Menu Button
+
+Returns the player to the main menu by calling the game's internal travel function.\
+Hold to activate (~1.5 seconds) to prevent accidental activation.
 
 ## Settings Button
 
 Opens the main settings menu.
-
 
 ## Settings
 
 The settings window will have the main settings for the entire overlay. These
 include:
 
-### Main Settings
+### General Settings
 
 - **Info Overlay**\
 When enabled, an indicator of active buttons will be displayed in the top-right
 corner of the process.
+
+- **Process Overlay on Hide**\
+When enabled, it will display a small video overlay that is uninteractable outside
+of moving it around and resizing it when the Hide Window button is currently enabled.
+
+- **Stop on Fail**\
+When enabled, it will stop all running buttons associated with input automation
+when a core gets destroyed and also play a sound. (Note: Only when hosting.)
+
+- **Performance Overlay**\
+When enabled, it will display resource stats of the computer, which can also
+individually be toggled on or off, such as:\
+FPS / Frames per Second\
+RAM Usage\
+CPU Usage\
+GPU Usage
+
+### Menu Size
+
+A slider that scales the entire UI between 50 % and 200 % with a smooth animation.
+
+### Audio Settings
+
+- **Volume Slider**\
+A volume slider for all overlay sounds (0–100 %).
+
+- **Mute Button Clicks**\
+Mutes the sounds when a button gets clicked or toggled on/off.
+
+- **Mute Stop on Fail**\
+Mutes the Stop on Fail sound that plays.
+
+### Windows
+
+A collapsible list of toggleable windows:
 
 - **General Window**\
 When enabled, the General window will be visible; otherwise, invisible.
@@ -69,11 +107,17 @@ When enabled, the General window will be visible; otherwise, invisible.
 - **Misc Window**\
 When enabled, the Misc window will be visible; otherwise, invisible.
 
+- **Buffing Window**\
+When enabled, the Buffing window will be visible; otherwise, invisible.
+
 - **Virtual Controller**\
 When enabled, the Virtual Controller window will be visible; otherwise, invisible.
 
 - **Profiles Window**\
 When enabled, the Profiles window will be visible; otherwise, invisible.
+
+- **Macro Manager**\
+When enabled, the Macro Manager window will be visible; otherwise, invisible.
 
 - **Mastery Level**\
 When enabled, will display a level icon that will gain experience by playing the game
@@ -88,35 +132,8 @@ due to the default in game bar often disappearing.
 When enabled, the Console will be visible; otherwise, invisible.
 
 - **Menu Logo**\
-When enabled, the menu logo (randomized from 8 different chibi witch girl images)
+When enabled, the menu logo (randomized from several chibi witch girl images)
 will be displayed in the bottom-left corner of the process.
-
-- **Stop on Fail**\
-When enabled, it will stop all running buttons associated with input automation
-when a core gets destroyed and also play a sound. (Note: Only when hosting.)
-
-- **Process Overlay on Hide**\
-When enabled, it will display a small video overlay that is uninteractable outside
-of moving it around and resizing it when the Hide Window button is currently enabled.
-
-- **Performance Overlay**\
-When enabled, it will display resource stats of the computer, which can also
-individually be toggled on or off, such as:\
-FPS / Frames per Second\
-RAM Usage\
-CPU Usage\
-GPU Usage
-
-### Audio Settings
-
-- **Volume Slider**\
-A volume slider for all the overlay sounds.
-
-- **Mute Button Clicks**\
-Mutes the sounds when a button gets clicked or toggled on/off.
-
-- **Mute Stop on Fail**\
-Mutes the Stop on Fail sound that plays.
 
 ### Theme Colors
 
@@ -144,16 +161,6 @@ Hotkey - Up to 2 combo hotkeys to quickly toggle the button. (ESC binds to None.
 Key - The key it holds down.\
 Hold - The duration the key is held down for.\
 Delay - The time it pauses after holding down the key before repeating its actions.
-
-- **Flash Buff**\
-By default: Automatically presses F once every 8 seconds.\
-This is used to automatically use the Flash Heal ability on Summoner along with the\
-Flash Buff rune to buff your defenses.
-
-- - You may configure:\
-Hotkey - Up to 2 combo hotkeys to quickly toggle the button. (ESC binds to None.)\
-Key - The key it holds down.\
-Interval - The time between each repeating action.
 
 - **Force Ready Up**\
 By default: Automatically holds down CTRL + G for 5 seconds and then pauses for 10 seconds.\
@@ -219,12 +226,49 @@ Hotkey - Up to 2 combo hotkeys to quickly toggle the button. (ESC binds to None.
 
 ----------------------------------------------------------------------------------
 
+## Buffing Window
+
+This window has auto-cast toggles for each Summoner buff. Buffs may include:
+
+- **Flash Buff**\
+By default: Automatically presses F once every 8 seconds.\
+This is used to automatically use the Flash Heal ability on Summoner along with the
+Flash Buff rune to buff your defenses.
+
+- - You may configure:\
+Hotkey - Up to 2 combo hotkeys to quickly toggle the button. (ESC binds to None.)\
+Key - The key it holds down.\
+Interval - The time between each repeating action.
+
+- **Pet Boost**\
+Automatically casts the Pet Boost ability.\
+Accepts a configurable key, interval, and mana threshold (default 15–70 mana).
+
+- **Wrath Form**\
+Automatically casts Wrath Form.\
+Accepts a configurable key, interval, and mana threshold (default 15–70 mana).
+
+- **Overcharge**\
+Automatically casts Overcharge then spams the activation key at 50 ms intervals.\
+Accepts a configurable key, interval, and mana threshold (default 15–70 mana).
+
+- **Defense Boost**\
+Automatically casts Defense Boost at a longer interval (default 13000 ms).
+
+All buffs have individually assignable hotkeys and persist their settings.
+
+----------------------------------------------------------------------------------
+
 ## Virtual Controller Window
 
 This window has a on screen controller layout that lets you control the game
 or mainly a split screen character.
 
 The window will not connect without ViGEmBus installed.
+
+Features a 16 button grid with hover/active animations, shift-latching for alternative
+mappings, and left/right analog stick pads that can be clicked to drag or right-clicked
+to latch the LS/RS press.
 
 ----------------------------------------------------------------------------------
 
@@ -235,7 +279,29 @@ currently active functions into a profile. The next time the profile button is
 pressed it will toggle all the functions within the profile.
 
 The Profiles additionally have a adjustable Hotkey button, rename button and 
-a delete button.
+a delete button. Profiles also save and restore macro states.
+
+----------------------------------------------------------------------------------
+
+## Macro Manager & Macro Editor
+
+This window lets you record, edit, and play back keyboard and mouse macro sequences
+with adjustable timing.
+
+The **Manager** lists all saved macros with expandable rows and animated dropdowns
+for selection and activation.
+
+The **Editor** supports up to 15 action types including:
+Key Down, Key Up, all mouse button presses, Wait (ms), Activate/Deactivate UI states,
+and mana-conditional state control (If Min Mana Activate, If Max Mana Deactivate, etc.).
+
+----------------------------------------------------------------------------------
+
+## Wave Overlay
+
+Rendered outside the menu and always visible when enabled. Displays wave progress,
+enemies alive / max enemies, a boss health bar, wave timer, current wave / max wave,
+and current mana. Data is read from the game's memory via AOB pattern hooks.
 
 ----------------------------------------------------------------------------------
 
