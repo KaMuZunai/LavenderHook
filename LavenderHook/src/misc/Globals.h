@@ -33,6 +33,7 @@ namespace LavenderHook::Globals
     inline bool show_menu_selector_window = false;
     inline bool show_menu_logo = true;
     inline bool show_profiles_window = false;
+    inline bool show_wiki_window = false;
 
     // Performance Overlay Settings
     inline bool show_perf_fps = true;

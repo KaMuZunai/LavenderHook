@@ -271,6 +271,7 @@ static void SaveMenuSettings()
     f << "mute_fail=" << BoolToStr(LavenderHook::Globals::mute_fail) << "\n";
     f << "show_process_overlay_on_hide=" << BoolToStr(LavenderHook::Globals::show_process_overlay_on_hide) << "\n";
     f << "show_wave_window=" << BoolToStr(LavenderHook::Globals::show_wave_window) << "\n";
+    f << "show_wiki_window=" << BoolToStr(LavenderHook::Globals::show_wiki_window) << "\n";
     f << "sound_volume=" << LavenderHook::Globals::sound_volume << "\n";
     f << "menu_scale=" << LavenderHook::Globals::menu_scale << "\n";
 }
@@ -314,6 +315,7 @@ void LoadMenuSettings()
         if (line.rfind("show_menu_logo", 0) == 0)            ReadBool(line, LavenderHook::Globals::show_menu_logo);
         if (line.rfind("show_process_overlay_on_hide", 0) == 0) ReadBool(line, LavenderHook::Globals::show_process_overlay_on_hide);
         if (line.rfind("show_wave_window", 0) == 0)              ReadBool(line, LavenderHook::Globals::show_wave_window);
+        if (line.rfind("show_wiki_window", 0) == 0)              ReadBool(line, LavenderHook::Globals::show_wiki_window);
         if (line.rfind("sound_volume", 0) == 0) {
             size_t eq = line.find('=');
             if (eq != std::string::npos)
@@ -444,7 +446,7 @@ namespace LavenderHook {
 
                 // collapsible sub-items
                 contentHeight += 4 * rowH * s_perfAnim;   // perf sub: FPS, RAM, CPU, GPU
-                contentHeight += 10 * rowH * s_windowsAnim; // windows sub: all toggles
+                contentHeight += 11 * rowH * s_windowsAnim; // windows sub: all toggles
 
                 // drive header animation 
                 float target = s_headerOpen ? 1.0f : 0.0f;
@@ -640,7 +642,7 @@ namespace LavenderHook {
                     if (DropdownArrowCustom("windows", expand_windows, s_windowsArrowAnim, alpha))
                         expand_windows = !expand_windows;
 
-                    CollapsibleBegin("##windows_section", s_windowsAnim, 10);
+                    CollapsibleBegin("##windows_section", s_windowsAnim, 11);
                     ImGui::Indent(18.f);
 
                     {
@@ -664,6 +666,7 @@ namespace LavenderHook {
                         WinCb("Macro Manager", LavenderHook::Globals::show_macro_window);
                         WinCb("Mastery Level", LavenderHook::Globals::show_paragon_level_window);
                         WinCb("Wave Overlay", LavenderHook::Globals::show_wave_window);
+                        WinCb("Lavender Wiki", LavenderHook::Globals::show_wiki_window);
                         WinCb("Console", LavenderHook::Globals::show_console);
                         WinCb("Menu Logo", LavenderHook::Globals::show_menu_logo);
 

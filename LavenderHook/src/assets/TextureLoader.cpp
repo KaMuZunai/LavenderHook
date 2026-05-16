@@ -1,5 +1,7 @@
 #include "TextureLoader.h"
 #include <cstdint>
+#include <cstdio>
+#include <vector>
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
@@ -22,6 +24,31 @@ void TextureLoader::Initialize(GraphicsBackend backend, void* device)
 bool TextureLoader::IsInitialized()
 {
     return g_device != nullptr;
+}
+
+Texture TextureLoader::LoadFromFile(const char* path)
+{
+    Texture result{};
+    if (!path || !g_device)
+        return result;
+
+    FILE* f = nullptr;
+    if (fopen_s(&f, path, "rb") != 0 || !f)
+        return result;
+
+    fseek(f, 0, SEEK_END);
+    long len = ftell(f);
+    fseek(f, 0, SEEK_SET);
+
+    if (len > 0)
+    {
+        std::vector<unsigned char> buf(len);
+        if (fread(buf.data(), 1, len, f) == (size_t)len)
+            result = LoadFromMemory(buf.data(), buf.size());
+    }
+
+    fclose(f);
+    return result;
 }
 
 Texture TextureLoader::LoadFromMemory(const void* data, size_t size)
@@ -78,4 +105,16 @@ Texture TextureLoader::LoadFromMemory(const void* data, size_t size)
 
     stbi_image_free(pixels);
     return result;
+}
+
+void TextureLoader::Free(Texture& texture)
+{
+    if (texture.IsValid() && g_backend == GraphicsBackend::DirectX11)
+    {
+        auto* srv = (ID3D11ShaderResourceView*)(uintptr_t)texture.id;
+        srv->Release();
+        texture.id = 0;
+        texture.width = 0;
+        texture.height = 0;
+    }
 }

@@ -17,6 +17,7 @@
 #include "../windows/MacroManagerWindow.h"
 #include "../windows/MacroEditorWindow.h"
 #include "../windows/TravelWindow.h"
+#include "../windows/WikiWindow.h"
 
 
 void RegisterUIWindows()
@@ -178,6 +179,27 @@ void RegisterUIWindows()
         nullptr,
         [] {
             LavenderHook::UI::Windows::WaveTrackerWindow::Render();
+        },
+        nullptr
+        });
+
+    ui.Register(UIWindowEntry{
+        [] {
+            LavenderHook::UI::Windows::WikiWindow::Update();
+        },
+        [] {
+            LavenderHook::UI::Windows::WikiWindow::Render(
+                LavenderHook::Globals::show_menu &&
+                LavenderHook::Globals::show_wiki_window
+            );
+        },
+        nullptr
+        });
+
+    ui.Register(UIWindowEntry{
+        nullptr,
+        [] {
+            LavenderHook::UI::Windows::WikiWindow::RenderFavoriteOverlay();
         },
         nullptr
         });
