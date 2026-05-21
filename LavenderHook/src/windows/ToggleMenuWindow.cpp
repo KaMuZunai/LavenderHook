@@ -6,8 +6,10 @@
 #include "../ui/components/LavenderFadeOut.h"
 #include "../ui/components/LavenderWindowHeader.h"
 #include "../assets/UITextures.h"
+#include "../webhook/WebhookManager.h"
 
 #include <fstream>
+#include <cstring>
 
 // Lies of Pi
 static constexpr float kPi = 3.14159265358979323846f;
@@ -274,6 +276,13 @@ static void SaveMenuSettings()
     f << "show_wiki_window=" << BoolToStr(LavenderHook::Globals::show_wiki_window) << "\n";
     f << "sound_volume=" << LavenderHook::Globals::sound_volume << "\n";
     f << "menu_scale=" << LavenderHook::Globals::menu_scale << "\n";
+
+    f << "webhook_url=" << LavenderHook::Webhook::url << "\n";
+    f << "webhook_user_id=" << LavenderHook::Webhook::user_id << "\n";
+    f << "webhook_map_finished_enabled=" << BoolToStr(LavenderHook::Webhook::map_finished_enabled) << "\n";
+    f << "webhook_core_destroyed_enabled=" << BoolToStr(LavenderHook::Webhook::core_destroyed_enabled) << "\n";
+    f << "webhook_map_finished_msg=" << LavenderHook::Webhook::map_finished_msg << "\n";
+    f << "webhook_core_destroyed_msg=" << LavenderHook::Webhook::core_destroyed_msg << "\n";
 }
 
 void LoadMenuSettings()
@@ -326,6 +335,21 @@ void LoadMenuSettings()
             if (eq != std::string::npos)
                 LavenderHook::Globals::menu_scale = std::stof(line.substr(eq + 1));
         }
+
+        auto ReadStr = [&](const std::string& key, std::string& out) {
+            size_t eq = line.find('=');
+            if (eq == std::string::npos) return;
+            if (line.size() > eq + 1)
+                out = line.substr(eq + 1);
+            else
+                out.clear();
+        };
+        if (line.rfind("webhook_url", 0) == 0)               ReadStr(line, LavenderHook::Webhook::url);
+        if (line.rfind("webhook_user_id", 0) == 0)           ReadStr(line, LavenderHook::Webhook::user_id);
+        if (line.rfind("webhook_map_finished_enabled", 0) == 0) ReadBool(line, LavenderHook::Webhook::map_finished_enabled);
+        if (line.rfind("webhook_core_destroyed_enabled", 0) == 0) ReadBool(line, LavenderHook::Webhook::core_destroyed_enabled);
+        if (line.rfind("webhook_map_finished_msg", 0) == 0)  ReadStr(line, LavenderHook::Webhook::map_finished_msg);
+        if (line.rfind("webhook_core_destroyed_msg", 0) == 0) ReadStr(line, LavenderHook::Webhook::core_destroyed_msg);
     }
 }
 
@@ -440,8 +464,8 @@ namespace LavenderHook {
                 // compute dynamic content height (collapsible sections scale with anim)
                 float contentHeight = 0.0f;
 
-                // always-visible items (14 + bottom pad)
-                contentHeight += 14 * rowH;
+                // always-visible items (15 + bottom pad)
+                contentHeight += 15 * rowH;
                 contentHeight += 3.5f * rowH;  // bottom padding
 
                 // collapsible sub-items
@@ -635,6 +659,123 @@ namespace LavenderHook {
                         }
                     }
                     ImGui::Unindent(8.0f);
+
+                    // Discord Webhook button
+                    {
+                        if (ImGui::Button("Discord Webhook", ImVec2(ImGui::GetContentRegionAvail().x, 0)))
+                            ImGui::OpenPopup("Discord Webhook Settings");
+                    }
+
+                    // Discord Webhook Settings popup
+                    ImGui::PushStyleColor(ImGuiCol_ModalWindowDimBg, ImVec4(0.0f, 0.0f, 0.0f, 0.65f));
+                    if (ImGui::BeginPopupModal("Discord Webhook Settings", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+                    {
+                        ImGui::TextUnformatted("Discord Webhook Settings");
+                        ImGui::Separator();
+
+                        ImGui::AlignTextToFramePadding();
+                        ImGui::TextUnformatted("Webhook URL:");
+                        ImGui::SameLine();
+                        char urlBuf[1024];
+                        std::strncpy(urlBuf, LavenderHook::Webhook::url.c_str(), sizeof(urlBuf));
+                        urlBuf[sizeof(urlBuf) - 1] = 0;
+                        ImGui::SetNextItemWidth(400.0f);
+                        if (ImGui::InputText("##webhook_url", urlBuf, sizeof(urlBuf)))
+                        {
+                            LavenderHook::Webhook::url = urlBuf;
+                            SaveMenuSettings();
+                        }
+
+                        ImGui::AlignTextToFramePadding();
+                        ImGui::TextUnformatted("User ID:");
+                        ImGui::SameLine();
+                        char uidBuf[64];
+                        std::strncpy(uidBuf, LavenderHook::Webhook::user_id.c_str(), sizeof(uidBuf));
+                        uidBuf[sizeof(uidBuf) - 1] = 0;
+                        ImGui::SetNextItemWidth(200.0f);
+                        if (ImGui::InputText("##webhook_uid", uidBuf, sizeof(uidBuf)))
+                        {
+                            LavenderHook::Webhook::user_id = uidBuf;
+                            SaveMenuSettings();
+                        }
+
+                        ImGui::Separator();
+                        bool mf = LavenderHook::Webhook::map_finished_enabled;
+                        if (ImGui::Checkbox("Map Finished", &mf))
+                        {
+                            LavenderHook::Webhook::map_finished_enabled = mf;
+                            SaveMenuSettings();
+                            LavenderHook::Audio::PlayToggleSound(mf);
+                        }
+                        if (LavenderHook::Webhook::map_finished_enabled)
+                        {
+                            char msgBuf[512];
+                            std::strncpy(msgBuf, LavenderHook::Webhook::map_finished_msg.c_str(), sizeof(msgBuf));
+                            msgBuf[sizeof(msgBuf) - 1] = 0;
+                            ImGui::Indent(16.0f);
+                            ImGui::SetNextItemWidth(400.0f);
+                            if (ImGui::InputText("##map_finished_msg", msgBuf, sizeof(msgBuf)))
+                            {
+                                LavenderHook::Webhook::map_finished_msg = msgBuf;
+                                SaveMenuSettings();
+                            }
+                            ImGui::Unindent(16.0f);
+                        }
+
+                        bool cd = LavenderHook::Webhook::core_destroyed_enabled;
+                        if (ImGui::Checkbox("Core Destroyed", &cd))
+                        {
+                            LavenderHook::Webhook::core_destroyed_enabled = cd;
+                            SaveMenuSettings();
+                            LavenderHook::Audio::PlayToggleSound(cd);
+                        }
+                        if (LavenderHook::Webhook::core_destroyed_enabled)
+                        {
+                            char msgBuf[512];
+                            std::strncpy(msgBuf, LavenderHook::Webhook::core_destroyed_msg.c_str(), sizeof(msgBuf));
+                            msgBuf[sizeof(msgBuf) - 1] = 0;
+                            ImGui::Indent(16.0f);
+                            ImGui::SetNextItemWidth(400.0f);
+                            if (ImGui::InputText("##core_destroyed_msg", msgBuf, sizeof(msgBuf)))
+                            {
+                                LavenderHook::Webhook::core_destroyed_msg = msgBuf;
+                                SaveMenuSettings();
+                            }
+                            ImGui::Unindent(16.0f);
+                        }
+
+                        ImGui::Separator();
+                        {
+                            ImGui::AlignTextToFramePadding();
+                            ImGui::TextUnformatted("Placeholders:");
+                            ImGui::SameLine();
+                            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.6f, 0.6f, 0.8f, 1.0f));
+                            if (ImGui::SmallButton("(?)"))
+                            {
+                                // open on click handled by IsItemHovered tooltip
+                            }
+                            ImGui::PopStyleColor();
+                            if (ImGui::IsItemHovered())
+                            {
+                                ImGui::BeginTooltip();
+                                ImGui::TextUnformatted("@User       - Mentions the configured user");
+                                ImGui::TextUnformatted("@Wave       - Current wave number");
+                                ImGui::TextUnformatted("@Gamemode   - Current game mode");
+                                ImGui::TextUnformatted("@Difficulty - Difficulty level");
+                                ImGui::TextUnformatted("@Modifiers  - Active modifiers (Hardcore/Rifted)");
+                                ImGui::TextUnformatted("@Bonus      - Bonus wave type");
+                                ImGui::TextUnformatted("@Map        - Map name");
+                                ImGui::EndTooltip();
+                            }
+                        }
+
+                        ImGui::Separator();
+                        if (ImGui::Button("Close", ImVec2(120, 0)))
+                            ImGui::CloseCurrentPopup();
+
+                        ImGui::EndPopup();
+                    }
+                    ImGui::PopStyleColor();
 
                     // Windows section
                     ImGui::Separator();

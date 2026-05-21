@@ -16,6 +16,8 @@ namespace LavenderHook::UI {
         bool asSeconds = false;
         bool asIntInput = false;
         bool isHotkey = false;
+        bool isCheckbox = false;
+        bool* checkboxValue = nullptr;
         int* hotkeyVK = nullptr;
         LavenderHook::UI::Lavender::Hotkey hotkey;
     };
@@ -105,6 +107,11 @@ namespace LavenderHook::UI {
             int* value,
             int min,
             int max
+        );
+
+        UIWindowBuilder& AddDropdownCheckbox(
+            const char* label,
+            bool* value
         );
 
         UIWindowBuilder& AddDropdownIntInput(

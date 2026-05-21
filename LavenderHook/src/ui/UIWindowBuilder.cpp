@@ -126,6 +126,26 @@ UIWindowBuilder& UIWindowBuilder::AddToggleDropdown(
     return *this;
 }
 
+UIWindowBuilder& UIWindowBuilder::AddDropdownCheckbox(
+    const char* label,
+    bool* value)
+{
+    if (m_items.empty())
+        return *this;
+
+    UIItem& it = m_items.back();
+    if (it.type != UIItemType::ToggleDropdown)
+        return *this;
+
+    UITiming t;
+    t.label = label;
+    t.isCheckbox = true;
+    t.checkboxValue = value;
+
+    it.timings.push_back(t);
+    return *this;
+}
+
 UIWindowBuilder& UIWindowBuilder::AddDropdownIntInput(
     const char* label,
     int* value,
@@ -790,11 +810,13 @@ void UIWindowBuilder::Render(bool wantVisible)
                             ImGui::PushStyleVar(ImGuiStyleVar_Alpha, a);
                             float rowStartY = ImGui::GetCursorPosY();
 
-                            ImGui::AlignTextToFramePadding();
-                            ImGui::TextUnformatted(tr.label);
+                            if (!tr.isCheckbox) {
+                                ImGui::AlignTextToFramePadding();
+                                ImGui::TextUnformatted(tr.label);
 
-                            ImGui::SameLine();
-                            ImGui::SetCursorPosX(controlX);
+                                ImGui::SameLine();
+                                ImGui::SetCursorPosX(controlX);
+                            }
 
                             if (tr.isHotkey) {
                                 if (tr.hotkeyVK) {
@@ -804,6 +826,13 @@ void UIWindowBuilder::Render(bool wantVisible)
                                     if (hkChanged)
                                         *tr.hotkeyVK = *tr.hotkey.keyVK;
                                 }
+                            }
+                            else if (tr.isCheckbox) {
+                                ImGui::AlignTextToFramePadding();
+                                ImGui::TextUnformatted(tr.label);
+                                ImGui::SameLine();
+                                ImGui::SetCursorPosX(controlX);
+                                ImGui::Checkbox(("##" + std::string(tr.label)).c_str(), tr.checkboxValue);
                             }
                             else {
                                 ImGui::SetNextItemWidth(kTimingSliderWidth * s);

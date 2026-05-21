@@ -1,6 +1,7 @@
 #include "MacroWindowsShared.h"
 #include "../input/InputAutomation.h"
 #include "../misc/Globals.h"
+#include "../misc/logmonitor/LogMonitor.h"
 #include <Windows.h>
 #include <chrono>
 #include <filesystem>
@@ -31,6 +32,8 @@ namespace LavenderHook::UI::Windows {
         "If Min Mana Deactivate",
         "If Max Mana Activate",
         "If Max Mana Deactivate",
+        "On Wave Activate State",
+        "On Wave Deactivate State",
     };
 
     bool g_editorOpen = false;
@@ -163,6 +166,11 @@ namespace LavenderHook::UI::Windows {
                     action.type == MacroActionType::IfMinManaActivate || action.type == MacroActionType::IfMinManaDeactivate ||
                     action.type == MacroActionType::IfMaxManaActivate || action.type == MacroActionType::IfMaxManaDeactivate)
                     f << "state." << si << ".action." << ai << ".targetState=" << action.targetState << "\n";
+                if (action.type == MacroActionType::WaveIntervalActivate || action.type == MacroActionType::WaveIntervalDeactivate)
+                {
+                    f << "state." << si << ".action." << ai << ".targetState=" << action.targetState << "\n";
+                    f << "state." << si << ".action." << ai << ".waveInterval=" << action.waveInterval << "\n";
+                }
                 if (action.type == MacroActionType::IfMinManaActivate || action.type == MacroActionType::IfMinManaDeactivate ||
                     action.type == MacroActionType::IfMaxManaActivate || action.type == MacroActionType::IfMaxManaDeactivate)
                     f << "state." << si << ".action." << ai << ".threshold=" << action.threshold << "\n";
@@ -187,6 +195,12 @@ namespace LavenderHook::UI::Windows {
         state.currentAction = 0;
         state.waiting = false;
         state.running = state.active;
+        for (auto& action : state.actions)
+        {
+            action->waveLastTriggered = 0;
+            action->waveWaiting = false;
+            action->waveDetectedTime = {};
+        }
     }
 
     static bool LoadMacroFile(const fs::path& path, MacroDefinition& macro)
@@ -234,6 +248,7 @@ namespace LavenderHook::UI::Windows {
                 action->waitMs = std::atoi(map["state." + std::to_string(si) + ".action." + std::to_string(ai) + ".waitMs"].c_str());
                 action->targetState = std::atoi(map["state." + std::to_string(si) + ".action." + std::to_string(ai) + ".targetState"].c_str());
                 action->threshold = std::atoi(map["state." + std::to_string(si) + ".action." + std::to_string(ai) + ".threshold"].c_str());
+                action->waveInterval = std::atoi(map["state." + std::to_string(si) + ".action." + std::to_string(ai) + ".waveInterval"].c_str());
                 state->actions.emplace_back(std::move(action));
             }
             macro.states.emplace_back(std::move(state));
@@ -361,9 +376,61 @@ namespace LavenderHook::UI::Windows {
                     ResetStateRuntime(*statePtr);
             }
 
+            // Wave interval action checking (for all running states)
             for (auto& statePtr : macro->states)
             {
                 auto& state = *statePtr;
+                if (!state.running) continue;
+                for (auto& actionPtr : state.actions)
+                {
+                    auto& action = *actionPtr;
+                    if (action.type != MacroActionType::WaveIntervalActivate &&
+                        action.type != MacroActionType::WaveIntervalDeactivate)
+                        continue;
+                    if (action.waveInterval <= 0) continue;
+
+                    int currentWave = LavenderHook::LogMonitor::GetCurrentWave();
+                    bool onInterval = currentWave > 0 && currentWave % action.waveInterval == 0;
+
+                    if (onInterval && currentWave != action.waveLastTriggered && !action.waveWaiting)
+                    {
+                        action.waveLastTriggered = currentWave;
+                        action.waveWaiting = true;
+                        action.waveDetectedTime = now;
+                    }
+
+                    if (!onInterval)
+                        action.waveLastTriggered = 0;
+
+                    if (action.waveWaiting)
+                    {
+                        auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - action.waveDetectedTime).count();
+                        if (elapsed >= 10)
+                        {
+                            action.waveWaiting = false;
+                            if (action.targetState >= 0 && action.targetState < (int)macro->states.size())
+                            {
+                                auto& target = *macro->states[action.targetState];
+                                if (action.type == MacroActionType::WaveIntervalActivate)
+                                {
+                                    target.running = true;
+                                    target.currentAction = 0;
+                                    target.waiting = false;
+                                }
+                                else
+                                {
+                                    target.running = false;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            for (auto& statePtr : macro->states)
+            {
+                auto& state = *statePtr;
+
                 if (!state.running || state.actions.empty())
                     continue;
 

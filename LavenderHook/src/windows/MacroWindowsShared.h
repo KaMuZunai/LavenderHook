@@ -24,6 +24,8 @@ namespace LavenderHook::UI::Windows {
         IfMinManaDeactivate,
         IfMaxManaActivate,
         IfMaxManaDeactivate,
+        WaveIntervalActivate,
+        WaveIntervalDeactivate,
     };
 
     struct MacroAction
@@ -33,7 +35,13 @@ namespace LavenderHook::UI::Windows {
         int waitMs = 100;
         int targetState = -1;
         int threshold = 0;
+        int waveInterval = 0;
         std::unique_ptr<LavenderHook::UI::Lavender::Hotkey> hotkey;
+
+        // Runtime state (not persisted)
+        int waveLastTriggered = 0;
+        bool waveWaiting = false;
+        std::chrono::steady_clock::time_point waveDetectedTime{};
     };
 
     struct MacroState

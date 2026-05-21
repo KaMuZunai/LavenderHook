@@ -47,6 +47,9 @@ namespace LavenderHook::Globals
 
     // Stop on Fail
 	inline bool stop_on_fail = true;
+
+    // Stop at wave 5 interval
+    inline bool stop_at_wave_5 = false;
     
     // Keep custom triangle cursor visible even when the menu is hidden
     inline bool show_triangle_when_menu_hidden = false;

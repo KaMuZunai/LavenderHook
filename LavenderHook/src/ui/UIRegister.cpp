@@ -18,6 +18,7 @@
 #include "../windows/MacroEditorWindow.h"
 #include "../windows/TravelWindow.h"
 #include "../windows/WikiWindow.h"
+#include "../webhook/WebhookManager.h"
 
 
 void RegisterUIWindows()
@@ -201,6 +202,14 @@ void RegisterUIWindows()
         [] {
             LavenderHook::UI::Windows::WikiWindow::RenderFavoriteOverlay();
         },
+        nullptr
+        });
+
+    ui.Register(UIWindowEntry{
+        [] {
+            LavenderHook::Webhook::Update();
+        },
+        nullptr,
         nullptr
         });
 

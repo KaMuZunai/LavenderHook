@@ -38,6 +38,8 @@ namespace LavenderHook::UI::Windows {
         "If Min Mana Deactivate",
         "If Max Mana Activate",
         "If Max Mana Deactivate",
+        "On Wave Activate State",
+        "On Wave Deactivate State",
     };
 
     static const char* MouseActionLabel(MacroActionType type)
@@ -177,6 +179,17 @@ namespace LavenderHook::UI::Windows {
                 ImGui::SameLine(0, 4);
                 ImGui::Text("%%");
             }
+
+            if (action.type == MacroActionType::WaveIntervalActivate || action.type == MacroActionType::WaveIntervalDeactivate)
+            {
+                if (action.waveInterval < 1) action.waveInterval = 5;
+                ImGui::SetNextItemWidth(100.0f);
+                if (ImGui::InputInt("Every N waves", &action.waveInterval))
+                {
+                    if (action.waveInterval < 1) action.waveInterval = 1;
+                    MarkMacrosDirty();
+                }
+            }
         }
 
         ImGui::SameLine(0, 4);
@@ -285,6 +298,7 @@ namespace LavenderHook::UI::Windows {
             ImGui::SameLine();
             if (ImGui::Checkbox("Loop", &state.loop))
                 MarkMacrosDirty();
+
         }
     }
 

@@ -77,6 +77,8 @@ namespace LavenderHook::UI::Windows {
         g_autoClickIntervalMs = cfg.EnsureInt("auto_click_interval_ms", 100);
         g_autoClickHotkey = cfg.EnsureInt("auto_click_hotkey", 0);
 
+        LavenderHook::Globals::stop_at_wave_5 = cfg.EnsureInt("stop_at_wave_5", 0) != 0;
+
         // Bind runtime hotkeys
         g_rtAutoG.keyVK = &g_autoGHotkey;
         g_rtAutoCtrlG.keyVK = &g_autoCtrlGHotkey;
@@ -109,10 +111,12 @@ additional configurations:
 Hotkey - Select Hotkey to toggle the button. (Esc binds to None)
 Key - Key that will be pressed when button is enabled (Default: G).
 Hold - Time the Key is being held down before released.
-Delay - Delay before it repeats after the last action has finished.)")
+Delay - Delay before it repeats after the last action has finished.
+Stop at 5 - Disables the button 10 seconds after a wave multiple of 5 is reached.)")
             .AddDropdownButton("Key:", &g_autoGPressKey)
             .AddDropdownTimingSeconds("Hold:", &g_autoGHoldMs, 100, 20000)
             .AddDropdownTimingSeconds("Delay:", &g_autoGDelayMs, 100, 20000)
+            .AddDropdownCheckbox("Stop at 5", &LavenderHook::Globals::stop_at_wave_5)
 
             .AddToggleDropdown("Force Ready Up", &autoCtrlG.enabled, &g_autoCtrlGHotkey)
             .AddItemDescription(R"(Presses the Force Ready Up Combo by Pressing the configured buttons.
@@ -121,11 +125,13 @@ Hotkey - Select Hotkey to toggle the button. (Esc binds to None)
 CTRL - Key that will be held down alongside the other button. (Default: CTRL)
 G - Key that will be held down to force the start. (Default: G)
 Hold - Time the Key is being held down before released.
-Delay - Delay before it repeats after the last action has finished.)")
+Delay - Delay before it repeats after the last action has finished.
+Stop at 5 - Disables the button 10 seconds after a wave multiple of 5 is reached.)")
             .AddDropdownButton("CTRL:", &g_autoCtrlGCtrlKey)
             .AddDropdownButton("G:", &g_autoCtrlGGKey)
             .AddDropdownTimingSeconds("Hold:", &g_autoCtrlGHoldMs, 5000, 20000)
             .AddDropdownTimingSeconds("Delay:", &g_autoCtrlGDelayMs, 100, 60000)
+            .AddDropdownCheckbox("Stop at 5", &LavenderHook::Globals::stop_at_wave_5)
 
             .AddToggleDropdown("Skip Cutscene", &skipCut.enabled, &g_skipHotkey)
             .AddItemDescription(R"(Skips Cutscenes by holding the configured button.
@@ -232,6 +238,17 @@ Interval - Time it takes for the action to repeat.)")
             for (int i = 0; i < 15; ++i)
                 prevVals[i] = currVals[i];
         }
+
+        // Save stop_at_wave_5 if changed
+        static int lastStopAtWave5 = -1;
+        int curStopAtWave5 = LavenderHook::Globals::stop_at_wave_5 ? 1 : 0;
+        if (curStopAtWave5 != lastStopAtWave5)
+        {
+            auto& cfg = Config::Store::Instance("general_buttons.ini");
+            cfg.SetInt("stop_at_wave_5", curStopAtWave5);
+            cfg.Save();
+            lastStopAtWave5 = curStopAtWave5;
+        }
     }
 
 } // namespace LavenderHook::UI::Windows
@@ -307,6 +324,48 @@ void LavenderHook::UI::Windows::GeneralButtonsWindow::UpdateActions()
                 autoG.enabled     = false;
                 autoCtrlG.enabled = false;
             }
+        }
+    }
+
+    // Stop at wave 5 interval (10-second grace, then disable)
+    {
+        static bool s_waiting = false;
+        static std::chrono::steady_clock::time_point s_waveDetected{};
+        static int s_lastTriggeredWave = 0;
+
+        if (LavenderHook::Globals::stop_at_wave_5)
+        {
+            int currentWave = LavenderHook::LogMonitor::GetCurrentWave();
+            bool onInterval = currentWave > 0 && currentWave % 5 == 0;
+
+            if (onInterval && currentWave != s_lastTriggeredWave && !s_waiting)
+            {
+                s_lastTriggeredWave = currentWave;
+                s_waveDetected = std::chrono::steady_clock::now();
+                s_waiting = true;
+            }
+
+            if (!onInterval)
+            {
+                s_lastTriggeredWave = 0;
+                s_waiting = false;
+            }
+
+            if (s_waiting)
+            {
+                const auto elapsed = std::chrono::steady_clock::now() - s_waveDetected;
+                if (elapsed >= std::chrono::seconds(10))
+                {
+                    s_waiting = false;
+                    autoG.enabled     = false;
+                    autoCtrlG.enabled = false;
+                }
+            }
+        }
+        else
+        {
+            s_waiting = false;
+            s_lastTriggeredWave = 0;
         }
     }
 
