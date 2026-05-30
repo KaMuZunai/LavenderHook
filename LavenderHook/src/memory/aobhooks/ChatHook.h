@@ -10,7 +10,6 @@
 #include <algorithm>
 #include "../aobutils/ScannerUtils.h"
 #include "../../misc/Globals.h"
-#include "../../ui/components/Console.h"
 
 namespace LavenderHook::Memory::ChatHook {
 
@@ -161,11 +160,6 @@ namespace LavenderHook::Memory::ChatHook {
         if (msg.message.empty() && msg.sender.empty())
             return;
 
-        {
-            std::string log = "[ChatHook] " + msg.sender + ": " + msg.message;
-            LavenderConsole::GetInstance().Log(log);
-        }
-
         std::lock_guard<std::mutex> lock(g_mutex);
         g_messages[g_writeIndex] = std::move(msg);
         g_writeIndex = (g_writeIndex + 1) % kMaxMessages;
@@ -262,26 +256,14 @@ namespace LavenderHook::Memory::ChatHook {
     {
         uint8_t* base = nullptr;
         size_t   size = 0;
-        if (!Utils::GetModuleRange(L"DDS-Win64-Shipping.exe", base, size)) {
-            LavenderConsole::GetInstance().Log("[ChatHook] FAILED: GetModuleRange");
+        if (!Utils::GetModuleRange(L"DDS-Win64-Shipping.exe", base, size))
             return false;
-        }
         uint8_t* hit = Utils::ScanPattern(base, size, k_Pattern, k_Mask, sizeof(k_Pattern));
-        if (!hit) {
-            LavenderConsole::GetInstance().Log("[ChatHook] FAILED: AOB pattern not found");
+        if (!hit)
             return false;
-        }
-        {
-            char buf[128];
-            _snprintf_s(buf, _TRUNCATE, "[ChatHook] pattern found at offset 0x%llX", (unsigned long long)(hit - base));
-            LavenderConsole::GetInstance().Log(buf);
-        }
-        if (!InstallHook(hit)) {
-            LavenderConsole::GetInstance().Log("[ChatHook] FAILED: InstallHook");
+        if (!InstallHook(hit))
             return false;
-        }
         Globals::chat_hook_active.store(true);
-        LavenderConsole::GetInstance().Log("[ChatHook] initialized successfully");
         return true;
     }
 

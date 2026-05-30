@@ -3,8 +3,8 @@
 #include <winver.h>
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 1,2,3,0
- PRODUCTVERSION 1,2,3,0
+ FILEVERSION 1,3,0,0
+ PRODUCTVERSION 1,3,0,0
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -20,11 +20,11 @@ VS_VERSION_INFO VERSIONINFO
     BEGIN
       VALUE "CompanyName",      ""
       VALUE "FileDescription",  "LavenderHook - QoL Automation Software\0"
-      VALUE "FileVersion",      "1.2.2.0\0"
+      VALUE "FileVersion",      "1.3.0.0\0"
       VALUE "InternalName",     "LavenderHook.dll\0"
       VALUE "OriginalFilename", "LavenderHook.dll\0"
       VALUE "ProductName",      "LavenderHook\0"
-      VALUE "ProductVersion",   "1.2.2.0\0"
+      VALUE "ProductVersion",   "1.3.0.0\0"
       VALUE "LegalCopyright",   "Copyright (c) 2026 LichtAbzeichen8. Licensed under MIT.\0"
     END
   END
@@ -64,3 +64,7 @@ TOGGLE_ON    WAVE "../sounds/toggle_on.wav"
 TOGGLE_OFF   WAVE "../sounds/toggle_off.wav"
 STOP_ON_FAIL WAVE "../sounds/stop_on_fail.wav"
 HIDE_NOTIF   WAVE "../sounds/hide_window.wav"
+TOGGLE_ON_POLISHED    WAVE "../sounds/toggle_on_polished.wav"
+TOGGLE_OFF_POLISHED   WAVE "../sounds/toggle_off_polished.wav"
+STOP_ON_FAIL_POLISHED WAVE "../sounds/stop_on_fail_polished.wav"
+HIDE_NOTIF_POLISHED   WAVE "../sounds/hide_window_polished.wav"

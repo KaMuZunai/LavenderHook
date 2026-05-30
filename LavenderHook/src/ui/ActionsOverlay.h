@@ -9,6 +9,7 @@ namespace LavenderHook {
 			void SetActive(const std::string& label, bool on);
 
 			void ClearAll();
+			std::vector<std::string> GetActiveList();
 
 		}
 	}

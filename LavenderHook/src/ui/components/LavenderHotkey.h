@@ -30,5 +30,6 @@ namespace LavenderHook::UI::Lavender {
 
     const char* VkToString(int vk); // exposed for displaying names
     bool IsAnyHotkeyListening();     // true while any hotkey button is capturing input
+    extern bool g_hotkey_binding_active;
 
 }

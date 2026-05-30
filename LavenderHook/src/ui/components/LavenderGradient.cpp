@@ -21,7 +21,8 @@ namespace LavenderHook::UI::Lavender {
         return (v < lo) ? lo : (v > hi) ? hi : v;
     }
 
-    void GradientText(const std::string& text, float alpha) {
+    void GradientText(const std::string& text, float alpha,
+                      float shadowOffX, float shadowOffY) {
 
         if (text.empty()) {
             ImGui::TextUnformatted("");
@@ -38,6 +39,7 @@ namespace LavenderHook::UI::Lavender {
         const float TWO_PI = 6.28318530718f;
 
         const ImVec4 base = C(gStyle.colorA);
+        const bool doShadow = (shadowOffX != 0 || shadowOffY != 0);
 
         float x = pos0.x;
         for (char c : text) {
@@ -50,6 +52,14 @@ namespace LavenderHook::UI::Lavender {
 
             // Pulsing brightness
             float brightness = 0.25f + wave * 1.50f;
+
+            if (doShadow) {
+                float normBright = (brightness - 0.25f) / 1.50f;
+                int shadowA = (int)(normBright * 90 * alpha);
+                if (shadowA > 0)
+                    dl->AddText(ImVec2(x + shadowOffX, pos0.y + shadowOffY),
+                                IM_COL32(0, 0, 0, shadowA), buf);
+            }
 
             ImVec4 col = {
                 ClampF(base.x * brightness, 0.0f, 1.0f),

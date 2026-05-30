@@ -4,6 +4,9 @@
 
 namespace LavenderHook::Config {
 
+    // Returns the config base directory (%APPDATA%\LavenderHook), creating it.
+    std::string GetBaseDir();
+
     class Store {
     public:
         // Legacy / default config
@@ -18,7 +21,7 @@ namespace LavenderHook::Config {
 
         // Accessors
         int  GetInt(const std::string& key, int def = 0) const;
-        int  EnsureInt(const std::string& key, int def); // ← NEW
+        int  EnsureInt(const std::string& key, int def);
         void SetInt(const std::string& key, int value);
 
     private:

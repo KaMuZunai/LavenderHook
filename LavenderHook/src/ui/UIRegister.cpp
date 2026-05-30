@@ -2,22 +2,23 @@
 #include "../misc/Globals.h"
 #include "../memory/aobutils/AobScanner.h"
 
-#include "../windows/GeneralButtonsWindow.h"
-#include "../windows/BuffingWindow.h"
-#include "../windows/MiscButtonsWindow.h"
-#include "../windows/GamepadWindow.h"
-#include "../windows/PerformanceOverlayWindow.h"
-#include "../windows/ToggleMenuWindow.h"
-#include "../windows/ProfilesWindow.h"
+#include "UIWindows/GeneralButtonsWindow.h"
+#include "UIWindows/BuffingWindow.h"
+#include "UIWindows/MiscButtonsWindow.h"
+#include "UIWindows/GamepadWindow.h"
+#include "UIWindows/PerformanceOverlayWindow.h"
+#include "UIWindows/SettingsWindow.h"
+#include "UIWindows/ProfilesWindow.h"
 #include "../ui/components/LavenderBackgroundDim.h"
 #include "../ui/components/console.h"
-#include "../windows/MenuLogoWindow.h"
-#include "../windows/ParagonLevelWindow.h"
-#include "../windows/WaveTrackerWindow.h"
-#include "../windows/MacroManagerWindow.h"
-#include "../windows/MacroEditorWindow.h"
-#include "../windows/TravelWindow.h"
-#include "../windows/WikiWindow.h"
+#include "UIWindows/MenuLogoWindow.h"
+#include "UIWindows/ParagonLevelWindow.h"
+#include "UIWindows/WaveTrackerWindow.h"
+#include "UIWindows/MacroManagerWindow.h"
+#include "UIWindows/MacroEditorWindow.h"
+#include "UIWindows/TravelWindow.h"
+#include "UIWindows/WikiWindow.h"
+#include "UIWindows/InfoOverlayWindow.h"
 #include "../webhook/WebhookManager.h"
 
 
@@ -25,17 +26,17 @@ void RegisterUIWindows()
 {
     auto& ui = UIRegistry::Get();
 
-	static LavenderHook::UI::LavenderBackgroundDim s_menuDim;
+    static LavenderHook::UI::LavenderBackgroundDim s_menuDim;
 
-	ui.Register(UIWindowEntry{
-		[] {
-			s_menuDim.Tick(LavenderHook::Globals::show_menu);
-		},
-		[] {
-			s_menuDim.Render();
-		},
-		nullptr
-		});
+    ui.Register(UIWindowEntry{
+        [] {
+            s_menuDim.Tick(LavenderHook::Globals::show_menu);
+        },
+        [] {
+            s_menuDim.Render();
+        },
+        nullptr
+        });
 
     ui.Register(UIWindowEntry{
         [] {
@@ -65,16 +66,16 @@ void RegisterUIWindows()
         });
 
     ui.Register(UIWindowEntry{
-    [] {
-        LavenderHook::UI::Windows::MiscButtonsWindow::UpdateActions();
-    },
-    [] {
-        LavenderHook::UI::Windows::MiscButtonsWindow::Render(
-            LavenderHook::Globals::show_menu &&
-            LavenderHook::Globals::show_misc_window
-        );
-    },
-    nullptr
+        [] {
+            LavenderHook::UI::Windows::MiscButtonsWindow::UpdateActions();
+        },
+        [] {
+            LavenderHook::UI::Windows::MiscButtonsWindow::Render(
+                LavenderHook::Globals::show_menu &&
+                LavenderHook::Globals::show_misc_window
+            );
+        },
+        nullptr
         });
 
     ui.Register(UIWindowEntry{
@@ -125,7 +126,7 @@ void RegisterUIWindows()
     ui.Register(UIWindowEntry{
         nullptr,
         [] {
-            LavenderHook::UI::Windows::RenderMenuSelectorWindow(
+            LavenderHook::UI::Windows::RenderSettingsWindow(
                 LavenderHook::Globals::show_menu &&
                 LavenderHook::Globals::show_menu_selector_window
             );
@@ -201,6 +202,14 @@ void RegisterUIWindows()
         nullptr,
         [] {
             LavenderHook::UI::Windows::WikiWindow::RenderFavoriteOverlay();
+        },
+        nullptr
+        });
+
+    ui.Register(UIWindowEntry{
+        nullptr,
+        [] {
+            LavenderHook::UI::Windows::InfoOverlayWindow::Render();
         },
         nullptr
         });

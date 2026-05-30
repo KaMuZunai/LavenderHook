@@ -22,4 +22,12 @@ namespace LavenderHook::UI::Lavender {
 
     // Layout Helpers
     void Separator(float thickness = 1.0f);
+
+    ImU32 PolishedAccent(float alpha = 1.0f);
+
+    void PolishedPanel(ImDrawList* dl, const ImVec2& p0, const ImVec2& p1,
+                       float rounding, float alpha,
+                       bool leftAccentBar = true, float sheenHeight = 0.0f);
+
+    void DrawWindowShadow(const ImVec2& pos, const ImVec2& size, float alpha = 1.0f);
 }

@@ -1,5 +1,6 @@
 #include "lavenderui.h"
 #include "../GUI.h"
+#include "../../misc/Globals.h"
 #include "../../imgui/imgui_internal.h"
 
 static float Animate(float current, float target, float speed = 12.0f)
@@ -135,4 +136,57 @@ namespace LavenderHook::UI::Lavender {
         ImGui::Dummy(ImVec2(0, thickness + s.ItemSpacing.y));
     }
 
+
+    ImU32 PolishedAccent(float alpha) {
+        const ImVec4& c = C(ImGuiCol_ButtonActive);
+        return IM_COL32((int)(c.x * 255.f), (int)(c.y * 255.f),
+                        (int)(c.z * 255.f), (int)(235.f * alpha));
+    }
+
+    void PolishedPanel(ImDrawList* dl, const ImVec2& p0, const ImVec2& p1,
+                       float rounding, float alpha,
+                       bool leftAccentBar, float sheenHeight)
+    {
+        if (!dl) return;
+
+        // soft drop shadow
+        dl->AddRectFilled(
+            ImVec2(p0.x + 1.f, p0.y + 3.f),
+            ImVec2(p1.x + 1.f, p1.y + 5.f),
+            IM_COL32(0, 0, 0, (int)(90.f * alpha)), rounding);
+
+        // frosted dark fill
+        dl->AddRectFilled(p0, p1, IM_COL32(22, 20, 28, (int)(235.f * alpha)), rounding);
+
+        // top sheen band
+        if (sheenHeight > 0.f) {
+            dl->AddRectFilled(
+                p0, ImVec2(p1.x, p0.y + sheenHeight),
+                IM_COL32(255, 255, 255, (int)(9.f * alpha)),
+                rounding, ImDrawFlags_RoundCornersTop);
+        }
+
+        // faint accent border
+        dl->AddRect(p0, p1, PolishedAccent(0.35f * alpha), rounding, 0, 1.f);
+
+        // left accent bar
+        if (leftAccentBar) {
+            dl->AddRectFilled(
+                p0, ImVec2(p0.x + 3.f, p1.y),
+                PolishedAccent(0.90f * alpha),
+                rounding, ImDrawFlags_RoundCornersLeft);
+        }
+    }
+
+    void DrawWindowShadow(const ImVec2& pos, const ImVec2& size, float alpha)
+    {
+        ImDrawList* bg = ImGui::GetBackgroundDrawList();
+        float r = ImGui::GetStyle().WindowRounding;
+        float s = LavenderHook::Globals::menu_scale;
+
+        bg->AddRectFilled(
+            ImVec2(pos.x - 4.f * s, pos.y + 2.f * s),
+            ImVec2(pos.x + size.x, pos.y + size.y + 5.f * s),
+            IM_COL32(0, 0, 0, (int)(85.f * alpha)), r);
+    }
 }

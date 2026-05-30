@@ -9,12 +9,12 @@
 #include "../../misc/Globals.h"
 #include "../../ui/GUI.h"
 #include "../../ui/UIRegister.h"
-#include "../../ui/UiDispatch.h"
+#include "../../ui/UIDispatch.h"
 #include "../../ui/components/console.h"
 
-#include "../../windows/HoldToKillButton.h"
-#include "../../windows/ToggleMenuButton.h"
-#include "../../windows/TravelToMenuButton.h"
+#include "../../ui/UIWindows/HoldToKillButton.h"
+#include "../../ui/UIWindows/ToggleMenuButton.h"
+#include "../../ui/UIWindows/TravelToMenuButton.h"
 
 #include "../../input/Hotkeys.h"
 
@@ -205,6 +205,7 @@ namespace {
         if (!ui_registered)
         {
             RegisterUIWindows();
+            DisplayStartupToolTip();
             ui_registered = true;
         }
     }

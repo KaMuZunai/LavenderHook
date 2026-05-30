@@ -41,9 +41,8 @@ namespace LavenderHook::Globals
     inline bool show_perf_cpu = true;
     inline bool show_perf_gpu = true;
 
-    // Info Overlay
-    inline bool show_ping = true;
-    inline bool show_server = true;
+    // Theme
+    inline bool use_polished_overlay = false;
 
     // Stop on Fail
 	inline bool stop_on_fail = true;

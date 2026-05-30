@@ -5,7 +5,7 @@
 
 namespace LavenderHook::Config {
 
-    static std::string GetBaseDir()
+    std::string GetBaseDir()
     {
         char* app = nullptr;
         size_t len = 0;

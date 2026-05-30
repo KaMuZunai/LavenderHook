@@ -20,6 +20,11 @@ namespace LavenderHook::UI {
         bool* checkboxValue = nullptr;
         int* hotkeyVK = nullptr;
         LavenderHook::UI::Lavender::Hotkey hotkey;
+
+        float* sliderFloat = nullptr;
+        float sliderMin = 0.0f;
+        float sliderMax = 0.0f;
+        const char* sliderFmt = "%.2f";
     };
 
 
@@ -27,6 +32,7 @@ namespace LavenderHook::UI {
         Toggle,
         ToggleDropdown,
         SliderInt,
+        SliderFloat,
         Button,
     };
 
@@ -58,6 +64,10 @@ namespace LavenderHook::UI {
         int* sliderInt = nullptr;
         int min = 0;
         int max = 0;
+
+        float* sliderFloat = nullptr;
+        float minF = 0.0f;
+        float maxF = 0.0f;
 
         std::function<void()> onClick;
         const char* description = nullptr;
@@ -109,6 +119,13 @@ namespace LavenderHook::UI {
             int max
         );
 
+        UIWindowBuilder& AddSliderFloat(
+            const char* label,
+            float* value,
+            float min,
+            float max
+        );
+
         UIWindowBuilder& AddDropdownCheckbox(
             const char* label,
             bool* value
@@ -119,6 +136,14 @@ namespace LavenderHook::UI {
             int* value,
             int min,
             int max
+        );
+
+        UIWindowBuilder& AddDropdownSliderFloat(
+            const char* label,
+            float* value,
+            float min,
+            float max,
+            const char* fmt = "%.2f"
         );
 
         UIWindowBuilder& AddButton(
@@ -149,6 +174,8 @@ namespace LavenderHook::UI {
 
 
         ImTextureID m_headerIcon = 0;
+
+        float m_lastContentHeight = 0.0f;
     };
 
 } // namespace LavenderHook::UI

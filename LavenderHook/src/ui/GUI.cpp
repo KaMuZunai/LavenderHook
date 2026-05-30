@@ -1,7 +1,8 @@
 ﻿#include "GUI.h"
-#include "components/LavenderGradient.h"
-#include "../windows/ToggleMenuWindow.h"
+#include "UIWindows/SettingsWindow.h"
 #include "components/LavenderFadeOut.h"
+#include "components/LavenderUI.h"
+#include "../misc/Globals.h"
 #include "../assets/TextureLoader.h"
 #include "../assets/resources/resource.h"
 #include "../sound/SoundPlayer.h"
@@ -17,7 +18,6 @@
 
 Texture g_dropLeft;
 Texture g_dropDown;
-Texture g_menuLogo;
 
 Texture g_emptyIco;
 
@@ -126,14 +126,6 @@ static std::string GetFileVersionString()
     return s;
 }
 
-extern bool LoadTheme();
-extern void ApplyThemeToImGui();
-extern void LoadMenuSettings();
-extern void InitMenuScale();
-namespace LavenderHook::UI::Windows {
-    void LoadPerfSettings();
-}
-
 namespace LavenderHook {
     namespace UI {
         namespace Actions {
@@ -170,42 +162,9 @@ ImVec4 DARK_RED = ImVec4(0.7300597429275513f, 0.4847022593021393f, 0.95708155632
 
 float WINDOW_BORDER_SIZE = 0.0f;
 
-
-void ApplyThemeToImGui()
-{
-    ImGuiStyle& style = ImGui::GetStyle();
-
-    style.Colors[ImGuiCol_Border] = ImVec4(MAIN_RED.x, MAIN_RED.y, MAIN_RED.z, 0.92f);
-    style.Colors[ImGuiCol_FrameBgHovered] = ImVec4(MAIN_RED.x, MAIN_RED.y, MAIN_RED.z, 0.56f);
-    style.Colors[ImGuiCol_FrameBgActive] = ImVec4(MAIN_RED.x, MAIN_RED.y, MAIN_RED.z, 0.56f);
-
-    style.Colors[ImGuiCol_Button] = ImVec4(MAIN_RED.x, MAIN_RED.y, MAIN_RED.z, 0.50f);
-    style.Colors[ImGuiCol_ButtonHovered] = ImVec4(MID_RED.x, MID_RED.y, MID_RED.z, 0.75f);
-    style.Colors[ImGuiCol_ButtonActive] = ImVec4(MID_RED.x, MID_RED.y, MID_RED.z, 0.92f);
-
-    style.Colors[ImGuiCol_Header] = ImVec4(MID_RED.x, MID_RED.y, MID_RED.z, 0.65f);
-    style.Colors[ImGuiCol_HeaderHovered] = ImVec4(MID_RED.x, MID_RED.y, MID_RED.z, 0.80f);
-    style.Colors[ImGuiCol_HeaderActive] = ImVec4(MID_RED.x, MID_RED.y, MID_RED.z, 0.92f);
-
-    style.Colors[ImGuiCol_Tab] = ImVec4(MAIN_RED.x, MAIN_RED.y, MAIN_RED.z, 0.44f);
-    style.Colors[ImGuiCol_TabActive] = ImVec4(MAIN_RED.x, MAIN_RED.y, MAIN_RED.z, 0.92f);
-    style.Colors[ImGuiCol_TabHovered] = ImVec4(MID_RED.x, MID_RED.y, MID_RED.z, 0.88f);
-
-    style.Colors[ImGuiCol_TextSelectedBg] = ImVec4(MID_RED.x, MID_RED.y, MID_RED.z, 0.92f);
-
-    style.Colors[ImGuiCol_PlotHistogram] = ImVec4(DARK_RED.x, DARK_RED.y, DARK_RED.z, 0.92f);
-    style.Colors[ImGuiCol_PlotHistogramHovered] = ImVec4(DARK_RED.x, DARK_RED.y, DARK_RED.z, 0.92f);
-
-    style.Colors[ImGuiCol_ScrollbarBg] = ImVec4(MAIN_RED.x, MAIN_RED.y, MAIN_RED.z, 0.56f);
-    style.Colors[ImGuiCol_ScrollbarGrab] = ImVec4(MAIN_RED.x, MAIN_RED.y, MAIN_RED.z, 0.78f);
-    style.Colors[ImGuiCol_ScrollbarGrabHovered] = ImVec4(MAIN_RED.x, MAIN_RED.y, MAIN_RED.z, 0.78f);
-    style.Colors[ImGuiCol_ScrollbarGrabActive] = ImVec4(MAIN_RED.x, MAIN_RED.y, MAIN_RED.z, 0.78f);
-}
-
 GUI::GUI()
 {
     LoadTheme();
-    ApplyThemeToImGui();
     LoadMenuSettings();
     LavenderHook::Audio::SetVolumePercent(LavenderHook::Globals::sound_volume);
     LoadPerfSettings();
@@ -298,15 +257,38 @@ GUI::GUI()
     style.Colors[ImGuiCol_NavWindowingDimBg] = ImVec4(0.8f, 0.8f, 0.8f, 0.2f);
     style.Colors[ImGuiCol_ModalWindowDimBg] = ImVec4(0.8f, 0.8f, 0.8f, 0.35f);
 
+    // Apply full theme (overrides style properties based on use_polished_overlay)
+    ApplyThemeToImGui();
 
     // font
     static bool fontLoaded = false;
     if (!fontLoaded) {
         ImGuiIO& io = ImGui::GetIO();
+        io.ConfigFlags &= ~ImGuiConfigFlags_NavEnableKeyboard;
+        char modPath[MAX_PATH] = {0};
+        GetModuleFileNameA(LavenderHook::Globals::dll_module, modPath, MAX_PATH);
+        std::string baseDir(modPath);
+        size_t pos = baseDir.find_last_of("\\/");
+        if (pos != std::string::npos) baseDir = baseDir.substr(0, pos);
+
+        // Always load Segoe UI as fallback
         char winDir[MAX_PATH]; size_t outlen = 0;
         getenv_s(&outlen, winDir, sizeof(winDir), "WINDIR");
-        std::string fontPath = outlen > 0 ? std::string(winDir) + "\\Fonts\\segoeui.ttf" : "C:\\Windows\\Fonts\\segoeui.ttf";
-        io.Fonts->AddFontFromFileTTF(fontPath.c_str(), 24.0f);
+        std::string segoePath = outlen > 0 ? std::string(winDir) + "\\Fonts\\segoeui.ttf" : "C:\\Windows\\Fonts\\segoeui.ttf";
+        io.Fonts->AddFontFromFileTTF(segoePath.c_str(), 24.0f);
+
+        // Load Segoe UI Semibold for polished theme (renders cleaner at larger sizes)
+        std::string semiboldPath = outlen > 0 ? std::string(winDir) + "\\Fonts\\seguisb.ttf" : "";
+        ImFont* semiboldFont = nullptr;
+        if (!semiboldPath.empty())
+            semiboldFont = io.Fonts->AddFontFromFileTTF(semiboldPath.c_str(), 24.0f);
+
+        // Set default font based on theme
+        if (semiboldFont && LavenderHook::Globals::use_polished_overlay)
+            io.FontDefault = semiboldFont;
+        else if (io.Fonts->Fonts.Size >= 1)
+            io.FontDefault = io.Fonts->Fonts[0];
+
         fontLoaded = true;
     }
 
@@ -357,7 +339,6 @@ static void TryLoadTextures()
 	static const TexEntry kTextures[] = {
 		{ DROP_LEFT, &g_dropLeft, &g_dropLeftTex },
 		{ DROP_DOWN, &g_dropDown, &g_dropDownTex },
-		{ MENU_LOGO, &g_menuLogo, &g_menuLogoTex },
 		{ EMPTY_ICO, &g_emptyIco, &g_emptyIcoTex },
 		{ ARROW_ICO, &g_arrowIco, &g_arrowIcoTex },
 		{ DOTS_ICO, &g_dotsIco, &g_dotsIcoTex },
@@ -391,8 +372,6 @@ void GUI::Render()
 {
 }
 
-static LavenderHook::UI::LavenderFadeOut g_info_overlay_fade;
-
 void GUI::RenderOverlay()
 {
     TryLoadTextures();
@@ -415,6 +394,8 @@ void GUI::RenderOverlay()
             ImDrawList* fdl = ImGui::GetForegroundDrawList();
             ImVec2 ds = ImGui::GetIO().DisplaySize;
 
+            bool polished = LavenderHook::Globals::use_polished_overlay;
+
             const std::string line0 = std::string("Version ") + (GetFileVersionString().empty() ? "Unknown" : GetFileVersionString());
             const std::string line1 = "Press \"Insert\" to Show/Hide menu.";
             const std::string line2 = "Press \"CTRL + F1\" to Show/Hide menu.";
@@ -434,10 +415,21 @@ void GUI::RenderOverlay()
             ImVec2 p0 = pos;
             ImVec2 p1 = ImVec2(pos.x + boxW, pos.y + boxH);
 
-            ImU32 bg = IM_COL32(20, 20, 20, (int)(200.0f * a));
-            ImU32 border = IM_COL32(80, 80, 80, (int)(200.0f * a));
-            fdl->AddRectFilled(p0, p1, bg, 8.0f);
-            fdl->AddRect(p0, p1, border, 8.0f);
+            if (polished) {
+                const float r = 8.0f;
+                ImU32 shadow = IM_COL32(0, 0, 0, (int)(85 * a));
+                fdl->AddRectFilled(ImVec2(p0.x + 1, p0.y + 3), ImVec2(p1.x + 1, p1.y + 4), shadow, r);
+                fdl->AddRectFilled(p0, p1, IM_COL32(22, 20, 28, (int)(196 * a)), r);
+                fdl->AddRectFilled(p0, ImVec2(p1.x, p0.y + (p1.y - p0.y) * 0.50f),
+                    IM_COL32(255, 255, 255, (int)(10 * a)), r, ImDrawFlags_RoundCornersTop);
+                fdl->AddRect(p0, p1, LavenderHook::UI::Lavender::PolishedAccent(0.50f * a), r, 0, 1.f);
+            }
+            else {
+                ImU32 bg = IM_COL32(20, 20, 20, (int)(200.0f * a));
+                ImU32 border = IM_COL32(80, 80, 80, (int)(200.0f * a));
+                fdl->AddRectFilled(p0, p1, bg, 8.0f);
+                fdl->AddRect(p0, p1, border, 8.0f);
+            }
 
             ImVec2 textPos = ImVec2(pos.x + pad, pos.y + pad);
             ImU32 textCol = IM_COL32(255, 255, 255, (int)(230.0f * a));
@@ -448,167 +440,5 @@ void GUI::RenderOverlay()
         }
     }
 
-    g_info_overlay_fade.Tick(LavenderHook::Globals::show_info_overlay);
-    if (!g_info_overlay_fade.ShouldRender())
-        return;
-
-    float alpha = g_info_overlay_fade.Alpha();
-    using namespace LavenderHook::UI::Lavender;
-
-    ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Always);
-    ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize, ImGuiCond_Always);
-
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.f);
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
-    ImGui::PushStyleVar(ImGuiStyleVar_Alpha, alpha);
-
-    ImGui::Begin(
-        "##overlay_root",
-        nullptr,
-        ImGuiWindowFlags_NoTitleBar |
-        ImGuiWindowFlags_NoResize |
-        ImGuiWindowFlags_NoMove |
-        ImGuiWindowFlags_NoScrollbar |
-        ImGuiWindowFlags_NoSavedSettings |
-        ImGuiWindowFlags_NoInputs |
-        ImGuiWindowFlags_NoBackground
-    );
-
-    ImDrawList* dl = ImGui::GetWindowDrawList();
-
-    const float screenW = ImGui::GetIO().DisplaySize.x;
-    const float margin = 28.f;
-    const float lineH = ImGui::GetTextLineHeight();
-    const float padY = 6.f;
-    const float itemH = lineH + padY * 2.f;
-    const float itemSpacing = 6.f;
-
-    float cursorY = margin;
-
-    auto DrawTextBg = [&](const ImVec2& pos, const std::string& text, float a)
-        {
-            const float padX = 10.f;
-            const float rounding = 7.f;
-
-            ImVec2 sz = ImGui::CalcTextSize(text.c_str());
-
-            ImVec2 p0 = pos;
-            ImVec2 p1 = ImVec2(
-                pos.x + sz.x + padX * 2.f,
-                pos.y + sz.y + padY * 2.f
-            );
-
-            ImU32 bg = IM_COL32(20, 20, 20, (int)(120 * a));
-            dl->AddRectFilled(p0, p1, bg, rounding);
-
-            ImGui::SetCursorScreenPos(ImVec2(
-                pos.x + padX,
-                pos.y + padY
-            ));
-
-            GradientText(text, a);
-        };
-
-    static double prevTime = ImGui::GetTime();
-    float dt = (float)(ImGui::GetTime() - prevTime);
-    prevTime = ImGui::GetTime();
-
-    cursorY += 12.f;
-    float actionsBaseY = cursorY;
-
-    // Actions
-    auto activeRaw = LavenderHook::UI::Actions::GetActiveList();
-
-    struct Measured { std::string label; float width; };
-    std::vector<Measured> measured;
-
-    for (auto& s : activeRaw)
-        measured.push_back({ s, ImGui::CalcTextSize(s.c_str()).x });
-
-    std::sort(measured.begin(), measured.end(),
-        [](auto& a, auto& b) {
-            if (a.width != b.width) return a.width > b.width;
-            return a.label < b.label;
-        });
-
-    std::vector<std::string> active;
-    for (auto& m : measured)
-        active.push_back(m.label);
-
-    struct AnimState {
-        float pos;
-        float alpha;
-        float slide;
-        int target;
-        bool exiting;
-    };
-
-    static std::unordered_map<std::string, AnimState> anim;
-
-    for (auto& kv : anim)
-        kv.second.target = -1;
-
-    for (int i = 0; i < (int)active.size(); ++i)
-    {
-        auto& label = active[i];
-        auto it = anim.find(label);
-
-        if (it == anim.end())
-            anim[label] = { (float)active.size(), 0.f, 60.f, i, false };
-        else {
-            it->second.target = i;
-            it->second.exiting = false;
-        }
-    }
-
-    for (auto& kv : anim)
-        if (kv.second.target == -1)
-            kv.second.exiting = true;
-
-    for (auto& kv : anim)
-    {
-        auto& a = kv.second;
-        a.pos += (a.target - a.pos) * std::clamp(12.f * dt, 0.f, 1.f);
-
-        if (!a.exiting) {
-            a.alpha += (1.f - a.alpha) * std::clamp(10.f * dt, 0.f, 1.f);
-            a.slide += (0.f - a.slide) * std::clamp(10.f * dt, 0.f, 1.f);
-        }
-        else {
-            a.alpha += (0.f - a.alpha) * std::clamp(8.f * dt, 0.f, 1.f);
-            a.slide += (80.f - a.slide) * std::clamp(8.f * dt, 0.f, 1.f);
-        }
-    }
-
-    struct DrawItem { std::string label; float pos, alpha, slide; };
-    std::vector<DrawItem> draw;
-
-    for (auto it = anim.begin(); it != anim.end(); )
-    {
-        if (it->second.exiting && it->second.alpha < 0.02f)
-            it = anim.erase(it);
-        else {
-            draw.push_back({ it->first, it->second.pos, it->second.alpha, it->second.slide });
-            ++it;
-        }
-    }
-
-    std::sort(draw.begin(), draw.end(),
-        [](auto& a, auto& b) { return a.pos < b.pos; });
-
-    for (auto& d : draw)
-    {
-        float w = ImGui::CalcTextSize(d.label.c_str()).x;
-        DrawTextBg(
-            ImVec2(
-                screenW - w - margin - 18.f + d.slide,
-                actionsBaseY + d.pos * (itemH + itemSpacing)
-            ),
-            d.label,
-            alpha * d.alpha
-        );
-    }
-
-    ImGui::End();
-    ImGui::PopStyleVar(3);
+    // Info overlay rendering is handled by InfoOverlayWindow
 }

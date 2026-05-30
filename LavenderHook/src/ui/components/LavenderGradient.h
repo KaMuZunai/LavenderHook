@@ -13,6 +13,8 @@ namespace LavenderHook::UI::Lavender {
     // Global style
     GradientStyle& Gradient();
 
-    // Draw text
-    void GradientText(const std::string& text, float alpha = 1.0f);
+    // Draw text with optional shadow offset (pixels, e.g. -1,1).
+    // The shadow opacity follows the wave so it fades where the text is dim.
+    void GradientText(const std::string& text, float alpha = 1.0f,
+                      float shadowOffX = 0, float shadowOffY = 0);
 }

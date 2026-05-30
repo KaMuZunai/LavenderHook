@@ -1,6 +1,6 @@
 #include "hooks.h"
-#include "../windows/functions/MiscButtonActions.h"
-#include "../windows/TravelWindow.h"
+#include "../ui/UIWindows/functions/MiscButtonActions.h"
+#include "../ui/UIWindows/TravelWindow.h"
 #include "../imgui/imgui.h"
 #include "../imgui/imgui_impl_win32.h"
 #include "../input/VirtualGamepad.h"

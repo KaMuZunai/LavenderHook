@@ -7,7 +7,6 @@ namespace LavenderHook::UI
     class LavenderFadeOut
     {
     public:
-        // Single call update 
         void Tick(bool wantVisible)
         {
             SetVisible(wantVisible);
@@ -16,31 +15,37 @@ namespace LavenderHook::UI
 
         void SetVisible(bool v)
         {
-            if (v)
-            {
-                if (m_target < 1.0f && m_alpha > 0.0f)
-                    m_alpha = 1.0f;
-                m_target = 1.0f;
-            }
-            else
-            {
-                m_target = 0.0f;
-            }
+            m_target = v ? 1.0f : 0.0f;
         }
 
         void Update()
         {
             float dt = ImGui::GetIO().DeltaTime;
-            m_alpha += (m_target - m_alpha) * m_speed * dt;
+            float diff = m_target - m_alpha;
+            if (fabsf(diff) < 0.001f)
+            {
+                m_alpha = m_target;
+                return;
+            }
 
-            // snap
+            float boost = 1.0f;
+            if (diff < 0.0f)
+            {
+                float a = m_alpha;
+                if (a <= 0.5f)
+                    boost = 3.0f;
+                else if (a < 0.65f)
+                    boost = 3.0f - 2.0f * (a - 0.5f) / 0.15f;
+            }
+
+            m_alpha += diff * m_speed * dt * boost;
+
             if (fabsf(m_alpha) < 0.001f) m_alpha = 0.0f;
             if (fabsf(m_alpha - 1.0f) < 0.001f) m_alpha = 1.0f;
         }
 
         float Alpha() const { return m_alpha; }
 
-        // Render while fading or visible
         bool ShouldRender() const
         {
             return m_alpha > 0.0f || m_target > 0.0f;
@@ -54,6 +59,6 @@ namespace LavenderHook::UI
     private:
         float m_alpha = 0.0f;
         float m_target = 0.0f;
-        float m_speed = 8.0f;
+        float m_speed = 4.0f;
     };
 }

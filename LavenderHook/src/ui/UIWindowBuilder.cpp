@@ -3,7 +3,7 @@
 #include "../imgui/imgui.h"
 #include "../imgui/imgui_internal.h"
 #include "../assets/UITextures.h"
-#include "../windows/ToggleMenuWindow.h"
+#include "UIWindows/SettingsWindow.h"
 #include "../misc/Globals.h"
 #include "GUI.h"
 #include "../sound/SoundPlayer.h"
@@ -23,7 +23,7 @@ namespace {
     constexpr float kHotkeyWidth = 70.0f;
     constexpr float kButtonWidth = 240.0f;
 
-    constexpr float kBaseHeight = 40.0f;
+    constexpr float kBaseHeight = 8.0f;
     constexpr float kRowHeight = 47.0f;
     constexpr float kRowSpacing = 8.0f;
 
@@ -197,6 +197,30 @@ UIWindowBuilder& UIWindowBuilder::AddDropdownTimingSeconds(
     return *this;
 }
 
+UIWindowBuilder& UIWindowBuilder::AddDropdownSliderFloat(
+    const char* label,
+    float* value,
+    float min,
+    float max,
+    const char* fmt)
+{
+    if (m_items.empty())
+        return *this;
+
+    UIItem& it = m_items.back();
+    if (it.type != UIItemType::ToggleDropdown)
+        return *this;
+
+    UITiming t{};
+    t.label = label;
+    t.sliderFloat = value;
+    t.sliderMin = min;
+    t.sliderMax = max;
+    t.sliderFmt = fmt;
+    it.timings.push_back(t);
+    return *this;
+}
+
 UIWindowBuilder& UIWindowBuilder::AddSlider(
     const char* label,
     int* value,
@@ -209,6 +233,23 @@ UIWindowBuilder& UIWindowBuilder::AddSlider(
     item.sliderInt = value;
     item.min = min;
     item.max = max;
+
+    m_items.push_back(item);
+    return *this;
+}
+
+UIWindowBuilder& UIWindowBuilder::AddSliderFloat(
+    const char* label,
+    float* value,
+    float min,
+    float max)
+{
+    UIItem item{};
+    item.type = UIItemType::SliderFloat;
+    item.label = label;
+    item.sliderFloat = value;
+    item.minF = min;
+    item.maxF = max;
 
     m_items.push_back(item);
     return *this;
@@ -245,9 +286,12 @@ float UIWindowBuilder::ComputeHeight() const
     float s = Scale(1.0f);
     float height = kBaseHeight * s;
 
+    // Polished theme has larger ItemSpacing.y (6 vs 4) and FramePadding, adding ~8px per item
+    float polishedExtra = LavenderHook::Globals::use_polished_overlay ? 8.0f * s : 0.0f;
+
     for (const auto& it : m_items)
     {
-        height += kRowHeight * s;
+                height += kRowHeight * s + polishedExtra;
 
         if (it.type == UIItemType::ToggleDropdown)
         {
@@ -336,6 +380,12 @@ void UIWindowBuilder::Render(bool wantVisible)
     float eased = EaseInOut(m_headerAnim);
 
     for (auto& it : m_items) {
+        if (it.type == UIItemType::Toggle && it.toggle) {
+            float pressedTarget = *it.toggle ? 1.0f : 0.0f;
+            it.colorAnim += (pressedTarget - it.colorAnim) * ImGui::GetIO().DeltaTime * 10.0f;
+            it.colorAnim = ImClamp(it.colorAnim, 0.0f, 1.0f);
+        }
+
         if (it.type != UIItemType::ToggleDropdown)
             continue;
 
@@ -351,17 +401,25 @@ void UIWindowBuilder::Render(bool wantVisible)
     }
 
     float s = Scale(1.0f);
-    float fullHeight = ComputeHeight();
     float collapsedHeight = (32.0f + 6.0f) * s;
 
+    // Always call ComputeHeight to update mutable layoutHeight values (used by dropdowns)
+    float computedHeight = ComputeHeight();
+
+    float estimateHeight = m_lastContentHeight > 0.0f
+        ? m_lastContentHeight
+        : computedHeight;
+
     float animatedHeight =
-        collapsedHeight + (fullHeight - collapsedHeight) * eased;
+        collapsedHeight + (estimateHeight - collapsedHeight) * eased;
 
     ImGui::SetNextWindowSize(
         ImVec2(m_width * s, animatedHeight),
         ImGuiCond_Always
     );
 
+
+    const bool polished = LavenderHook::Globals::use_polished_overlay;
 
     ImGuiWindowFlags flags =
         ImGuiWindowFlags_NoResize |
@@ -374,6 +432,7 @@ void UIWindowBuilder::Render(bool wantVisible)
         ImGui::End();
         return;
     }
+    float contentStartY = ImGui::GetCursorPosY();
 
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
 
@@ -392,16 +451,32 @@ void UIWindowBuilder::Render(bool wantVisible)
 
     ImU32 mixed = LerpColor(title, frame, 0.55f);
 
-    // background
     float r = ImGui::GetStyle().WindowRounding;
 
-    dl->AddRectFilled(
-        ImVec2(winPos.x, winPos.y),
-        ImVec2(winPos.x + winSize.x, winPos.y + headerHeight),
-        mixed,
-        r,
-        ImDrawFlags_RoundCornersTop
-    );
+    if (polished) {
+        // top sheen
+        dl->AddRectFilled(
+            ImVec2(winPos.x, winPos.y),
+            ImVec2(winPos.x + winSize.x, winPos.y + headerHeight),
+            IM_COL32(255, 255, 255, (int)(9.f * m_fade.Alpha())),
+            r, ImDrawFlags_RoundCornersTop);
+
+        // accent divider under the header (window bg is frosted from theme)
+        dl->AddLine(
+            ImVec2(winPos.x + 1.0f, winPos.y + headerHeight),
+            ImVec2(winPos.x + winSize.x - 1.0f, winPos.y + headerHeight),
+            PolishedAccent(0.55f * m_fade.Alpha()), 1.0f);
+    }
+    else {
+        // simple flat header bar
+        dl->AddRectFilled(
+            ImVec2(winPos.x, winPos.y),
+            ImVec2(winPos.x + winSize.x, winPos.y + headerHeight),
+            mixed,
+            r,
+            ImDrawFlags_RoundCornersTop
+        );
+    }
 
     // interaction zone
     ImGui::SetCursorScreenPos(winPos);
@@ -483,14 +558,20 @@ void UIWindowBuilder::Render(bool wantVisible)
 
     ImU32 col = ImGui::GetColorU32(ImGuiCol_Text);
 
-    // draw text multiple times with tiny offsets
-    dl->AddText(ImVec2(textPos.x + 1, textPos.y), col, m_title);
-    dl->AddText(ImVec2(textPos.x - 1, textPos.y), col, m_title);
-    dl->AddText(ImVec2(textPos.x, textPos.y + 1), col, m_title);
-    dl->AddText(ImVec2(textPos.x, textPos.y - 1), col, m_title);
-
-    // main text on top
-    dl->AddText(textPos, col, m_title);
+    if (polished) {
+        // soft shadow + crisp text, matching the frosted overlay
+        ImU32 sh = ImGui::GetColorU32(ImVec4(0, 0, 0, 0.55f * m_fade.Alpha()));
+        dl->AddText(ImVec2(textPos.x + 1, textPos.y + 1), sh, m_title);
+        dl->AddText(textPos, col, m_title);
+    }
+    else {
+        // draw text multiple times with tiny offsets
+        dl->AddText(ImVec2(textPos.x + 1, textPos.y), col, m_title);
+        dl->AddText(ImVec2(textPos.x - 1, textPos.y), col, m_title);
+        dl->AddText(ImVec2(textPos.x, textPos.y + 1), col, m_title);
+        dl->AddText(ImVec2(textPos.x, textPos.y - 1), col, m_title);
+        dl->AddText(textPos, col, m_title);
+    }
 
 
     // arrow anim
@@ -544,7 +625,7 @@ void UIWindowBuilder::Render(bool wantVisible)
         if (finalAlpha > 0.001f)
         {
             for (auto& it : m_items) {
-                float itemSpacing = kRowSpacing;
+                float itemSpacing = kRowSpacing * s;
                 switch (it.type) {
 
                 case UIItemType::Toggle:
@@ -558,12 +639,35 @@ void UIWindowBuilder::Render(bool wantVisible)
                     ImGui::SameLine();
 
                     bool hkChanged = false;
-                    if (it.hotkeyIndex >= 0)
+                    if (it.hotkeyIndex >= 0) {
                         hkChanged = m_hotkeys[it.hotkeyIndex]
-                        .Render(ImVec2(kHotkeyWidth * s, ImGui::GetFrameHeight()));
+                            .Render(ImVec2(kHotkeyWidth * s, ImGui::GetFrameHeight()));
+                        // Polished: top sheen on hotkey button
+                        if (polished) {
+                            ImVec2 rMin = ImGui::GetItemRectMin();
+                            ImVec2 rMax = ImGui::GetItemRectMax();
+                            dl->AddRectFilled(rMin, ImVec2(rMax.x, rMin.y + (rMax.y - rMin.y) * 0.50f),
+                                IM_COL32(255, 255, 255, (int)(9.f * finalAlpha)),
+                                ImGui::GetStyle().FrameRounding, ImDrawFlags_RoundCornersTop);
+                        }
+                    }
 
                     if (!hkChanged && it.hotkeyVK)
                         *it.hotkeyVK = hkBackup;
+
+                    // Polished: light up toggle when active, smoothly
+                    if (polished && it.toggle) {
+                        float press = EaseInOut(it.colorAnim);
+                        if (press > 0.01f) {
+                            ImVec2 rMin = ImGui::GetItemRectMin();
+                            ImVec2 rMax = ImGui::GetItemRectMax();
+                            dl->AddRectFilled(rMin, rMax,
+                                ImGui::GetColorU32(ImVec4(
+                                    MAIN_RED.x, MAIN_RED.y, MAIN_RED.z,
+                                    0.60f * press)),
+                                ImGui::GetStyle().FrameRounding);
+                        }
+                    }
                 }
                 break;
 
@@ -612,27 +716,37 @@ void UIWindowBuilder::Render(bool wantVisible)
 
                     ImDrawList* dl = ImGui::GetWindowDrawList();
 
-                    ImU32 baseCol = ImGui::GetColorU32(ImGuiCol_FrameBg);
-                    ImU32 hoverCol = ImGui::GetColorU32(ImGuiCol_FrameBgHovered);
-                    ImU32 activeCol = ImGui::GetColorU32(ImGuiCol_ButtonActive);
+                    if (polished) {
+                        float rr = ImGui::GetStyle().FrameRounding;
+                        // Drop shadow + frosted fill + top sheen + accent border
+                        PolishedPanel(dl, pos,
+                            ImVec2(pos.x + width, pos.y + height),
+                            rr, finalAlpha, false, height * 0.5f);
 
-                    ImU32 highlightCol = active ? activeCol : hoverCol;
+                        // Colored highlight when active/held, smoothly animated
+                        if (t > 0.01f) {
+                            dl->AddRectFilled(pos,
+                                ImVec2(pos.x + width, pos.y + height),
+                                ImGui::GetColorU32(ImVec4(
+                                    MAIN_RED.x, MAIN_RED.y, MAIN_RED.z,
+                                    0.60f * t)),
+                                rr);
+                        }
+                    }
+                    else {
+                        ImU32 baseCol = ImGui::GetColorU32(ImGuiCol_FrameBg);
+                        ImU32 hoverCol = ImGui::GetColorU32(ImGuiCol_FrameBgHovered);
+                        ImU32 activeCol = ImGui::GetColorU32(ImGuiCol_ButtonActive);
 
+                        ImU32 highlightCol = active ? activeCol : hoverCol;
+                        ImU32 bg = LerpColor(baseCol, highlightCol, t);
 
-                    ImU32 bg = LerpColor(baseCol, highlightCol, t);
+                        ImGui::RenderFrame(pos,
+                            ImVec2(pos.x + width, pos.y + height),
+                            bg, true, ImGui::GetStyle().FrameRounding);
+                    }
 
-
-
-                    ImGui::RenderFrame(
-                        pos,
-                        ImVec2(pos.x + width, pos.y + height),
-                        bg,
-                        true,
-                        ImGui::GetStyle().FrameRounding
-                    );
-
-
-                    if (WINDOW_BORDER_SIZE > 0.0f)
+                    if (WINDOW_BORDER_SIZE > 0.0f && !polished)
                     {
                         dl->AddRect(
                             pos,
@@ -653,12 +767,19 @@ void UIWindowBuilder::Render(bool wantVisible)
                         );
                     }
 
-                    dl->AddText(
-                        ImVec2(pos.x + 8.0f * s,
-                            pos.y + (height - ImGui::GetFontSize()) * 0.5f),
-                        ImGui::GetColorU32(ImGuiCol_Text),
-                        it.label
-                    );
+                    {
+                        ImU32 textCol = ImGui::GetColorU32(ImGuiCol_Text);
+                        if (polished && t > 0.01f) {
+                            float dim = 1.0f - 0.30f * t;
+                            ImVec4 tc = ImGui::ColorConvertU32ToFloat4(textCol);
+                            tc.x *= dim; tc.y *= dim; tc.z *= dim;
+                            textCol = ImGui::GetColorU32(tc);
+                        }
+                        dl->AddText(
+                            ImVec2(pos.x + 8.0f * s,
+                                pos.y + (height - ImGui::GetFontSize()) * 0.5f),
+                            textCol, it.label);
+                    }
 
 
                     if (g_dropLeftTex) {
@@ -818,7 +939,23 @@ void UIWindowBuilder::Render(bool wantVisible)
                                 ImGui::SetCursorPosX(controlX);
                             }
 
-                            if (tr.isHotkey) {
+                            if (tr.sliderFloat) {
+                                ImGui::SetNextItemWidth(kTimingSliderWidth * s);
+                                ImGui::SliderFloat(
+                                    ("##" + std::string(tr.label)).c_str(),
+                                    tr.sliderFloat,
+                                    tr.sliderMin,
+                                    tr.sliderMax,
+                                    tr.sliderFmt
+                                );
+                                float wheel = ImGui::GetIO().MouseWheel;
+                                if (wheel != 0.0f && ImGui::IsItemHovered())
+                                {
+                                    *tr.sliderFloat += wheel * 0.01f;
+                                }
+                                *tr.sliderFloat = ImClamp(*tr.sliderFloat, tr.sliderMin, tr.sliderMax);
+                            }
+                            else if (tr.isHotkey) {
                                 if (tr.hotkeyVK) {
                                     // make sure hotkey instance is bound to the correct storage
                                     tr.hotkey.keyVK = tr.hotkeyVK;
@@ -855,6 +992,13 @@ void UIWindowBuilder::Render(bool wantVisible)
                                         sec = std::round(sec * 10.0f) / 10.0f;
                                         *tr.valueMs = (int)(sec * 1000.0f);
                                     }
+                                    float wheel = ImGui::GetIO().MouseWheel;
+                                    if (wheel != 0.0f && ImGui::IsItemHovered()) {
+                                        sec += wheel * 0.1f;
+                                        sec = std::round(sec * 10.0f) / 10.0f;
+                                        sec = ImClamp(sec, tr.minMs / 1000.0f, tr.maxMs / 1000.0f);
+                                        *tr.valueMs = (int)(sec * 1000.0f);
+                                    }
                                 }
                                 else {
                                     ImGui::SliderInt(
@@ -864,6 +1008,11 @@ void UIWindowBuilder::Render(bool wantVisible)
                                         tr.maxMs,
                                         "%dms"
                                     );
+                                    float wheel = ImGui::GetIO().MouseWheel;
+                                    if (wheel != 0.0f && ImGui::IsItemHovered()) {
+                                        *tr.valueMs += (int)(wheel > 0 ? 10 : -10);
+                                        *tr.valueMs = ImClamp(*tr.valueMs, tr.minMs, tr.maxMs);
+                                    }
                                 }
                             }
 
@@ -934,10 +1083,26 @@ void UIWindowBuilder::Render(bool wantVisible)
                         preferBoxMin.y = ImClamp(preferBoxMin.y, edgePad, display.y - edgePad - size.y);
                         preferBoxMax = ImVec2(preferBoxMin.x + size.x, preferBoxMin.y + size.y);
 
+                        // draw shadow (polished only)
+                        if (polished) {
+                            dl->AddRectFilled(
+                                ImVec2(preferBoxMin.x - 4.f * s, preferBoxMin.y + 2.f * s),
+                                ImVec2(preferBoxMax.x, preferBoxMax.y + 5.f * s),
+                                IM_COL32(0, 0, 0, (int)(85.f * a)), 6.0f);
+                        }
+
                         // draw background with alpha
                         ImVec4 bgf = ImGui::ColorConvertU32ToFloat4(bg);
                         bgf.w *= a;
                         dl->AddRectFilled(preferBoxMin, preferBoxMax, ImGui::GetColorU32(bgf), 6.0f);
+
+                        // draw border (polished only)
+                        if (polished) {
+                            ImU32 borderCol = ImGui::GetColorU32(ImGuiCol_Border);
+                            ImVec4 bf = ImGui::ColorConvertU32ToFloat4(borderCol);
+                            bf.w *= a * 0.7f;
+                            dl->AddRect(preferBoxMin, preferBoxMax, ImGui::GetColorU32(bf), 6.0f, 0, 1.0f);
+                        }
 
                         ImVec2 textPos(preferBoxMin.x + padding.x, preferBoxMin.y + padding.y);
                         ImVec4 fgf = ImGui::ColorConvertU32ToFloat4(fg);
@@ -951,18 +1116,74 @@ void UIWindowBuilder::Render(bool wantVisible)
 
                 case UIItemType::SliderInt:
                     SliderInt(it.label, it.sliderInt, it.min, it.max);
+                    if (polished) {
+                        ImVec2 rMin = ImGui::GetItemRectMin();
+                        ImVec2 rMax = ImGui::GetItemRectMax();
+                        dl->AddRectFilled(rMin, ImVec2(rMax.x, rMin.y + (rMax.y - rMin.y) * 0.50f),
+                            IM_COL32(255, 255, 255, (int)(9.f * finalAlpha)),
+                            ImGui::GetStyle().FrameRounding, ImDrawFlags_RoundCornersTop);
+                    }
+                    {
+                        float wheel = ImGui::GetIO().MouseWheel;
+                        if (wheel != 0.0f && ImGui::IsItemHovered()) {
+                            *it.sliderInt += (int)(wheel > 0 ? 1 : -1);
+                            *it.sliderInt = ImClamp(*it.sliderInt, it.min, it.max);
+                        }
+                    }
+                    break;
+
+                case UIItemType::SliderFloat:
+                    SliderFloat(it.label, it.sliderFloat, it.minF, it.maxF, "%.2f");
+                    if (polished) {
+                        ImVec2 rMin = ImGui::GetItemRectMin();
+                        ImVec2 rMax = ImGui::GetItemRectMax();
+                        dl->AddRectFilled(rMin, ImVec2(rMax.x, rMin.y + (rMax.y - rMin.y) * 0.50f),
+                            IM_COL32(255, 255, 255, (int)(9.f * finalAlpha)),
+                            ImGui::GetStyle().FrameRounding, ImDrawFlags_RoundCornersTop);
+                    }
+                    {
+                        float wheel = ImGui::GetIO().MouseWheel;
+                        if (wheel != 0.0f && ImGui::IsItemHovered()) {
+                            *it.sliderFloat += wheel * (it.maxF - it.minF) * 0.01f;
+                            *it.sliderFloat = ImClamp(*it.sliderFloat, it.minF, it.maxF);
+                        }
+                    }
                     break;
 
                 case UIItemType::Button:
+                {
+                    bool btnHeld = false; // track via ImGui
                     if (Button(it.label, ImVec2(kButtonWidth * s, 0)) && it.onClick)
                         it.onClick();
+                    if (polished && ImGui::IsItemActive()) {
+                        ImVec2 rMin = ImGui::GetItemRectMin();
+                        ImVec2 rMax = ImGui::GetItemRectMax();
+                        dl->AddRectFilled(rMin, rMax,
+                            ImGui::GetColorU32(ImVec4(
+                                MAIN_RED.x, MAIN_RED.y, MAIN_RED.z,
+                                0.60f * finalAlpha)),
+                            ImGui::GetStyle().FrameRounding);
+                    }
                     break;
+                }
                 }
                 ImGui::Dummy(ImVec2(0, itemSpacing));
             }
         }
         ImGui::PopStyleVar();
     }
+    float contentEndY = ImGui::GetCursorPosY();
+    float actualContent = ((contentEndY - contentStartY) + kBaseHeight * s) * eased;
+    if (m_lastContentHeight == 0.0f)
+        m_lastContentHeight = actualContent;
+    m_lastContentHeight += (actualContent - m_lastContentHeight) * ImGui::GetIO().DeltaTime * 20.0f;
+    if (fabsf(m_lastContentHeight - actualContent) < 0.5f)
+        m_lastContentHeight = actualContent;
+
+    ImVec2 sbPos = ImGui::GetWindowPos();
+    ImVec2 sbSize = ImGui::GetWindowSize();
     ImGui::End();
+    if (polished)
+        Lavender::DrawWindowShadow(sbPos, sbSize, m_fade.Alpha());
     ImGui::PopStyleVar();
 }

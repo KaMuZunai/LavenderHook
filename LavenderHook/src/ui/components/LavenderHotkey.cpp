@@ -9,6 +9,9 @@ namespace LavenderHook::UI::Lavender {
     static std::unordered_map<int, bool> bindEdge;
     static Hotkey* g_listening_hotkey = nullptr;
     static std::unordered_map<int, bool> s_suppressToggleUntilUp;
+    static DWORD g_last_bind_end_time = 0;
+    static constexpr DWORD kBindCooldownMs = 200;
+    bool g_hotkey_binding_active = false;
 
     bool Hotkey::Render(const ImVec2& size)
     {
@@ -27,6 +30,7 @@ namespace LavenderHook::UI::Lavender {
                 pending_first_vk = 0;
                 waiting_for_combo = false;
                 g_listening_hotkey = this;
+                g_hotkey_binding_active = true;
             }
             else if (g_listening_hotkey != this) {
                 // Cancel previous listener and start listening on this one.
@@ -37,6 +41,7 @@ namespace LavenderHook::UI::Lavender {
                 pending_first_vk = 0;
                 waiting_for_combo = false;
                 g_listening_hotkey = this;
+                g_hotkey_binding_active = true;
             }
             return true;
         }
@@ -53,6 +58,7 @@ namespace LavenderHook::UI::Lavender {
         if (fgPid != GetCurrentProcessId())
         {
             listening = false;
+            g_last_bind_end_time = GetTickCount(); g_hotkey_binding_active = false;
             if (g_listening_hotkey == this) g_listening_hotkey = nullptr;
             return false;
         }
@@ -62,6 +68,7 @@ namespace LavenderHook::UI::Lavender {
             *keyVK = 0;
             listening = false;
             ignore_until_up = false;
+            g_last_bind_end_time = GetTickCount(); g_hotkey_binding_active = false;
             if (g_listening_hotkey == this) g_listening_hotkey = nullptr;
             return true;
         }
@@ -139,6 +146,7 @@ namespace LavenderHook::UI::Lavender {
 
                     // unstuck keys
                     bindEdge.clear();
+                    g_last_bind_end_time = GetTickCount(); g_hotkey_binding_active = false;
                     if (g_listening_hotkey == this) g_listening_hotkey = nullptr;
                     return true;
                 }
@@ -173,6 +181,7 @@ namespace LavenderHook::UI::Lavender {
                     waiting_for_combo = false;
 
                     bindEdge.clear();
+                    g_last_bind_end_time = GetTickCount(); g_hotkey_binding_active = false;
                     if (g_listening_hotkey == this) g_listening_hotkey = nullptr;
                     bindEdge[code] = down;
                     return true;
@@ -192,6 +201,7 @@ namespace LavenderHook::UI::Lavender {
 
                     // unstuck keys
                     bindEdge.clear();
+                    g_last_bind_end_time = GetTickCount(); g_hotkey_binding_active = false;
                     if (g_listening_hotkey == this) g_listening_hotkey = nullptr;
                     bindEdge[code] = down;
                     return true;
@@ -232,6 +242,7 @@ namespace LavenderHook::UI::Lavender {
                     waiting_for_combo = false;
 
                     bindEdge.clear();
+                    g_last_bind_end_time = GetTickCount(); g_hotkey_binding_active = false;
                     if (g_listening_hotkey == this) g_listening_hotkey = nullptr;
                     return true;
                 }
@@ -268,6 +279,7 @@ namespace LavenderHook::UI::Lavender {
                     waiting_for_combo = false;
 
                     bindEdge.clear();
+                    g_last_bind_end_time = GetTickCount(); g_hotkey_binding_active = false;
                     if (g_listening_hotkey == this) g_listening_hotkey = nullptr;
                     bindEdge[code] = down;
                     return true;
@@ -286,6 +298,7 @@ namespace LavenderHook::UI::Lavender {
                     s_suppressToggleUntilUp[code] = true;
 
                     bindEdge.clear();
+                    g_last_bind_end_time = GetTickCount(); g_hotkey_binding_active = false;
                     if (g_listening_hotkey == this) g_listening_hotkey = nullptr;
                     bindEdge[code] = down;
                     return true;
@@ -362,6 +375,7 @@ namespace LavenderHook::UI::Lavender {
             if (sit2 != s_suppressToggleUntilUp.end() && sit2->second) {
                 if (!down2) {
                     sit2->second = false;
+                    g_last_bind_end_time = GetTickCount(); g_hotkey_binding_active = false;
                     if (g_listening_hotkey != nullptr && !g_listening_hotkey->listening)
                         g_listening_hotkey = nullptr;
                 }
@@ -393,6 +407,7 @@ namespace LavenderHook::UI::Lavender {
         if (sit != s_suppressToggleUntilUp.end() && sit->second) {
             if (!down) {
                 sit->second = false;
+                g_last_bind_end_time = GetTickCount(); g_hotkey_binding_active = false;
                 if (g_listening_hotkey != nullptr && !g_listening_hotkey->listening)
                     g_listening_hotkey = nullptr;
             }
@@ -425,7 +440,12 @@ namespace LavenderHook::UI::Lavender {
 
     bool IsAnyHotkeyListening()
     {
-        return g_listening_hotkey != nullptr;
+        if (g_listening_hotkey != nullptr)
+            return true;
+        if (g_last_bind_end_time != 0 && GetTickCount() - g_last_bind_end_time < kBindCooldownMs)
+            return true;
+        g_last_bind_end_time = 0;
+        return false;
     }
 
 } // namespace LavenderHook::UI::Lavender

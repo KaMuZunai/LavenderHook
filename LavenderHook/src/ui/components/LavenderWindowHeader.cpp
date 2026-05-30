@@ -1,4 +1,5 @@
 #include "LavenderWindowHeader.h"
+#include "LavenderUI.h"
 #include "../../imgui/imgui_internal.h"
 #include "../../misc/Globals.h"
 #include <cmath>
@@ -54,20 +55,37 @@ namespace LavenderHook::UI::Lavender {
         ImVec2 winPos = ImGui::GetWindowPos();
         ImDrawList* dl = ImGui::GetWindowDrawList();
 
-        // blended background
-        ImU32 titleBg = ImGui::GetColorU32(ImGuiCol_TitleBg);
-        ImU32 frameBg = ImGui::GetColorU32(ImGuiCol_FrameBg);
-        ImU32 bg = LerpColor(titleBg, frameBg, 0.55f);
-
+        bool polished = LavenderHook::Globals::use_polished_overlay;
         float r = ImGui::GetStyle().WindowRounding;
 
-        dl->AddRectFilled(
-            ImVec2(winPos.x, winPos.y),
-            ImVec2(winPos.x + width, winPos.y + headerHeight),
-            bg,
-            r,
-            ImDrawFlags_RoundCornersTop
-        );
+        if (polished) {
+            // In polished mode the window background is already frosted dark.
+            // Just add a subtle top sheen and an accent divider under the header.
+            dl->AddRectFilled(
+                ImVec2(winPos.x, winPos.y),
+                ImVec2(winPos.x + width, winPos.y + headerHeight),
+                IM_COL32(255, 255, 255, (int)(9.f * fadeAlpha)),
+                r, ImDrawFlags_RoundCornersTop);
+
+            dl->AddLine(
+                ImVec2(winPos.x + 1.0f, winPos.y + headerHeight),
+                ImVec2(winPos.x + width - 1.0f, winPos.y + headerHeight),
+                PolishedAccent(0.55f * fadeAlpha), 1.0f);
+        }
+        else {
+            // blended background
+            ImU32 titleBg = ImGui::GetColorU32(ImGuiCol_TitleBg);
+            ImU32 frameBg = ImGui::GetColorU32(ImGuiCol_FrameBg);
+            ImU32 bg = LerpColor(titleBg, frameBg, 0.55f);
+
+            dl->AddRectFilled(
+                ImVec2(winPos.x, winPos.y),
+                ImVec2(winPos.x + width, winPos.y + headerHeight),
+                bg,
+                r,
+                ImDrawFlags_RoundCornersTop
+            );
+        }
 
 
         // interaction zone
@@ -129,11 +147,15 @@ namespace LavenderHook::UI::Lavender {
 
         ImU32 textCol = ImGui::GetColorU32(ImGuiCol_Text);
 
-        dl->AddText(ImVec2(tp.x + 1, tp.y), textCol, title);
-        dl->AddText(ImVec2(tp.x - 1, tp.y), textCol, title);
-        dl->AddText(ImVec2(tp.x, tp.y + 1), textCol, title);
-        dl->AddText(ImVec2(tp.x, tp.y - 1), textCol, title);
-        dl->AddText(tp, textCol, title);
+        if (polished) {
+            dl->AddText(tp, textCol, title);
+        } else {
+            dl->AddText(ImVec2(tp.x + 1, tp.y), textCol, title);
+            dl->AddText(ImVec2(tp.x - 1, tp.y), textCol, title);
+            dl->AddText(ImVec2(tp.x, tp.y + 1), textCol, title);
+            dl->AddText(ImVec2(tp.x, tp.y - 1), textCol, title);
+            dl->AddText(tp, textCol, title);
+        }
 
         // arrow
         float target = headerOpen ? 1.0f : 0.0f;
