@@ -44,10 +44,10 @@ namespace LavenderHook::Globals
     // Theme
     inline bool use_polished_overlay = false;
 
-    // Stop on Fail
+	// Stop on Fail
 	inline bool stop_on_fail = true;
 
-    // Stop at wave 5 interval
+	// Stop at wave 5 interval
     inline bool stop_at_wave_5 = false;
     
     // Keep custom triangle cursor visible even when the menu is hidden
@@ -56,10 +56,10 @@ namespace LavenderHook::Globals
     // video overlay
     inline bool show_process_overlay_on_hide = false;
 
-    // UI scale multiplier
+	// UI scale multiplier
     inline float menu_scale = 1.0f;
 
-    // Sound volume percentage
+	// Sound volume percentage
     inline int sound_volume = 100;
 	inline bool mute_buttons = false;
 	inline bool mute_fail = false;
@@ -70,13 +70,13 @@ namespace LavenderHook::Globals
     // Request for chopped Minimize to clear its toggle after regaining focus
     inline bool minimize_auto_clear_requested = false;
 
-    // Set while the game window is hidden
+	// Set while the game window is hidden
     inline bool window_hidden = false;
-
-    // XInput queries
+	
+	// XInput queries
     inline thread_local bool xinput_our_query = false;
 
-    // DLL module handle
+	// DLL module handle
     inline HMODULE dll_module = nullptr;
     // Tray callback message id
     inline UINT tray_callback_message = WM_APP + 100;
@@ -92,7 +92,7 @@ namespace LavenderHook::Globals
     inline std::atomic<float> mana_current{ 0.f };
     inline std::atomic<float> mana_max{ 0.f };
 
-    // Wave Timer
+	// Wave Timer
     inline std::atomic<int>   wave_time{ 0 };
 
     // Chat

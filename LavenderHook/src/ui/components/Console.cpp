@@ -18,7 +18,7 @@ static int ConsoleInputCallback(ImGuiInputTextCallbackData* data)
 
 void LavenderConsole::Render(bool wantVisible)
 {
-    // Tick fade every frame
+	// Tick fade every frame
     g_console_fade.Tick(wantVisible);
 
     if (!g_console_fade.ShouldRender())
