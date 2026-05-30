@@ -1491,8 +1491,21 @@ namespace LavenderHook::UI::Windows {
         float sw = WS();
         ImGui::PushStyleVar(ImGuiStyleVar_Alpha, alpha);
 
+        float maxFavTextW = 0.0f;
+        for (const auto& favPath : m_favorites) {
+            std::string favName;
+            for (const auto& me : m_manifest) {
+                if (me.path == favPath) { favName = me.name; break; }
+            }
+            if (!favName.empty()) {
+                float tw = ImGui::CalcTextSize(favName.c_str()).x;
+                if (tw > maxFavTextW) maxFavTextW = tw;
+            }
+        }
+        float iconS_calc = 24.0f * sw;
+        float desiredFavW = iconS_calc + 6 * sw + maxFavTextW + 14 * sw;
         ImGui::SetNextWindowBgAlpha(0.3f);
-        ImGui::SetNextWindowSizeConstraints(ImVec2(160 * sw, 0), ImVec2(FLT_MAX, FLT_MAX));
+        ImGui::SetNextWindowSizeConstraints(ImVec2(desiredFavW, 0), ImVec2(desiredFavW, FLT_MAX));
 
         ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoScrollbar |
             ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav |

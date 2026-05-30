@@ -21,13 +21,13 @@ namespace LavenderHook {
 
         static const wchar_t kThumbnailClass[] = L"LvHkThumbnailOverlay";
 
-        static constexpr int kTitleH      = 24;
+        static constexpr int kTitleH      = 30;
         static constexpr int kBorder      = 6; 
         static constexpr int kVideoBorder = 2;
-        static constexpr int kCornerR     = 8;
+        static constexpr int kCornerR     = 10;
 
-        static constexpr int kChatBtnW = 50;
-        static constexpr int kChatBtnH = 18;
+        static constexpr int kChatBtnW = 58;
+        static constexpr int kChatBtnH = 22;
         // Chat panel height scales with window
         static int GetChatPanelHeight(int totalClientH)
         {
@@ -70,22 +70,105 @@ namespace LavenderHook {
                        static_cast<BYTE>(c.z * 255.f));
         }
 
-        static void ApplyWindowRgn(HWND hwnd)
-        {
-            RECT wr{};
-            GetWindowRect(hwnd, &wr);
-            const int w = wr.right  - wr.left;
-            const int h = wr.bottom - wr.top;
+        // polished-theme GDI helpers
+        static bool Polished() { return LavenderHook::Globals::use_polished_overlay; }
 
-            HRGN rr   = CreateRoundRectRgn(0, 0,
-                                            w + 1, h + kCornerR * 2 + 1,
-                                            kCornerR * 2, kCornerR * 2);
-            HRGN rect = CreateRectRgn(0, 0, w + 1, h + 1);
-            HRGN rgn  = CreateRectRgn(0, 0, 0, 0);
-            CombineRgn(rgn, rr, rect, RGN_AND);
-            DeleteObject(rr);
-            DeleteObject(rect);
-            SetWindowRgn(hwnd, rgn, TRUE);
+        static COLORREF LerpColor(COLORREF a, COLORREF b, float t)
+        {
+            if (t < 0.f) t = 0.f;
+            if (t > 1.f) t = 1.f;
+            int ar = GetRValue(a), ag = GetGValue(a), ab = GetBValue(a);
+            int br = GetRValue(b), bg = GetGValue(b), bb = GetBValue(b);
+            return RGB((BYTE)(ar + (br - ar) * t),
+                       (BYTE)(ag + (bg - ag) * t),
+                       (BYTE)(ab + (bb - ab) * t));
+        }
+
+        // Vertical gradient via scanline fills (no msimg32 dependency).
+        static void VGradient(HDC hdc, const RECT& rc, COLORREF top, COLORREF bot)
+        {
+            const int h = rc.bottom - rc.top;
+            if (h <= 0) return;
+            for (int y = 0; y < h; ++y) {
+                float t = (float)y / (float)(h > 1 ? h - 1 : 1);
+                COLORREF c = LerpColor(top, bot, t);
+                HBRUSH br = CreateSolidBrush(c);
+                RECT line = { rc.left, rc.top + y, rc.right, rc.top + y + 1 };
+                FillRect(hdc, &line, br);
+                DeleteObject(br);
+            }
+        }
+
+        // Horizontal accent strip fading
+        static void HGradientStrip(HDC hdc, const RECT& rc, COLORREF accent, COLORREF fade)
+        {
+            const int w = rc.right - rc.left;
+            if (w <= 0) return;
+            for (int x = 0; x < w; ++x) {
+                float t = (float)x / (float)(w > 1 ? w - 1 : 1);
+                COLORREF c = LerpColor(accent, fade, t);
+                HBRUSH br = CreateSolidBrush(c);
+                RECT line = { rc.left + x, rc.top, rc.left + x + 1, rc.bottom };
+                FillRect(hdc, &line, br);
+                DeleteObject(br);
+            }
+        }
+
+        // Rounded accent pill with a top sheen.
+        static void DrawPolishedPill(HDC hdc, const RECT& rc, COLORREF fill,
+                                     COLORREF border, bool sheen)
+        {
+            const int r = (rc.bottom - rc.top) / 2;
+
+            // Base rounded fill + border.
+            HBRUSH fb = CreateSolidBrush(fill);
+            HPEN   bp = CreatePen(PS_SOLID, 1, border);
+            HBRUSH ofb = (HBRUSH)SelectObject(hdc, fb);
+            HPEN   obp = (HPEN)SelectObject(hdc, bp);
+            RoundRect(hdc, rc.left, rc.top, rc.right, rc.bottom, r * 2, r * 2);
+            SelectObject(hdc, ofb);
+            SelectObject(hdc, obp);
+            DeleteObject(fb);
+            DeleteObject(bp);
+
+            // Sheen
+            if (sheen) {
+                HRGN clip = CreateRoundRectRgn(rc.left + 1, rc.top + 1,
+                                               rc.right, rc.bottom, r * 2, r * 2);
+                SelectClipRgn(hdc, clip);
+                RECT topHalf = { rc.left, rc.top,
+                                 rc.right, rc.top + (rc.bottom - rc.top) / 2 };
+                COLORREF s = LerpColor(fill, RGB(255, 255, 255), 0.22f);
+                VGradient(hdc, topHalf, s, fill);
+                SelectClipRgn(hdc, nullptr);
+                DeleteObject(clip);
+            }
+        }
+
+        // DWM attribute constants.
+        #ifndef DWMWA_WINDOW_CORNER_PREFERENCE
+        #define DWMWA_WINDOW_CORNER_PREFERENCE 33
+        #endif
+        #ifndef DWMWA_BORDER_COLOR
+        #define DWMWA_BORDER_COLOR 34
+        #endif
+        #ifndef DWMWCP_ROUND
+        #define DWMWCP_ROUND 2
+        #endif
+
+        // hardware-anti-aliased rounded corners.
+        static void ApplyWindowStyle(HWND hwnd)
+        {
+            // Make sure no hard region clips the corners.
+            SetWindowRgn(hwnd, nullptr, TRUE);
+
+            int corner = DWMWCP_ROUND;
+            DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE,
+                                  &corner, sizeof(corner));
+
+            COLORREF border = Polished() ? g_colors.mid : g_colors.main;
+            DwmSetWindowAttribute(hwnd, DWMWA_BORDER_COLOR,
+                                  &border, sizeof(border));
         }
 
         // Returns the chat panel client rect
@@ -107,47 +190,132 @@ namespace LavenderHook {
             out.bottom = out.top + kChatBtnH;
         }
 
+        // Cached Segoe UI Semibold title font.
+        static HFONT TitleFont()
+        {
+            static HFONT s_font = nullptr;
+            if (!s_font) {
+                s_font = CreateFontW(
+                    16, 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE,
+                    DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+                    CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, L"Segoe UI Semibold");
+            }
+            return s_font;
+        }
+        static HFONT ButtonFont()
+        {
+            static HFONT s_font = nullptr;
+            if (!s_font) {
+                s_font = CreateFontW(
+                    12, 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE,
+                    DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+                    CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, L"Segoe UI Semibold");
+            }
+            return s_font;
+        }
+        static HFONT ChatFont()
+        {
+            static HFONT s_font = nullptr;
+            if (!s_font) {
+                s_font = CreateFontW(
+                    15, 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE,
+                    DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+                    CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, L"Segoe UI Semibold");
+            }
+            return s_font;
+        }
+
         static void DrawTitleBar(HDC hdc, const RECT& cr)
         {
-            HBRUSH bg = CreateSolidBrush(g_colors.bg);
             RECT titleRc = { cr.left, cr.top, cr.right, cr.top + kTitleH };
-            FillRect(hdc, &titleRc, bg);
-            DeleteObject(bg);
 
-            HBRUSH s1 = CreateSolidBrush(g_colors.main);
-            RECT sep1 = { cr.left, kTitleH - 2, cr.right, kTitleH - 1 };
-            FillRect(hdc, &sep1, s1);
-            DeleteObject(s1);
+            if (Polished()) {
+                // vertical sheen across the whole bar
+                COLORREF sheenTop = LerpColor(g_colors.bg, RGB(255, 255, 255), 0.12f);
+                COLORREF sheenMid = LerpColor(g_colors.bg, RGB(255, 255, 255), 0.03f);
+                RECT topHalf = { cr.left, cr.top, cr.right, cr.top + kTitleH / 2 };
+                RECT botHalf = { cr.left, cr.top + kTitleH / 2, cr.right, cr.top + kTitleH };
+                VGradient(hdc, topHalf, sheenTop, sheenMid);
+                VGradient(hdc, botHalf, sheenMid, g_colors.bg);
 
-            HBRUSH s2 = CreateSolidBrush(g_colors.dark);
-            RECT sep2 = { cr.left, kTitleH - 1, cr.right, kTitleH };
-            FillRect(hdc, &sep2, s2);
-            DeleteObject(s2);
+                // Accent left tick.
+                HBRUSH tick = CreateSolidBrush(g_colors.mid);
+                RECT tickRc = { cr.left, cr.top, cr.left + 3, cr.top + kTitleH };
+                FillRect(hdc, &tickRc, tick);
+                DeleteObject(tick);
+
+                // Glowing accent underline.
+                RECT sep = { cr.left, cr.top + kTitleH - 2, cr.right, cr.top + kTitleH };
+                HGradientStrip(hdc, sep, g_colors.main, g_colors.bg);
+                RECT glow = { cr.left, cr.top + kTitleH, cr.right, cr.top + kTitleH + 3 };
+                VGradient(hdc, glow, LerpColor(g_colors.bg, g_colors.main, 0.25f), g_colors.bg);
+            }
+            else {
+                HBRUSH bg = CreateSolidBrush(g_colors.bg);
+                FillRect(hdc, &titleRc, bg);
+                DeleteObject(bg);
+
+                HBRUSH s1 = CreateSolidBrush(g_colors.main);
+                RECT sep1 = { cr.left, cr.top + kTitleH - 2, cr.right, cr.top + kTitleH - 1 };
+                FillRect(hdc, &sep1, s1);
+                DeleteObject(s1);
+
+                HBRUSH s2 = CreateSolidBrush(g_colors.dark);
+                RECT sep2 = { cr.left, cr.top + kTitleH - 1, cr.right, cr.top + kTitleH };
+                FillRect(hdc, &sep2, s2);
+                DeleteObject(s2);
+            }
 
             SetBkMode(hdc, TRANSPARENT);
-            SetTextColor(hdc, g_colors.dark);
-            HFONT font = CreateFontW(
-                13, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
-                DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
-                CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, L"Segoe UI");
-            HFONT oldFont = static_cast<HFONT>(SelectObject(hdc, font));
-            RECT tr = { cr.left + 10, cr.top, cr.right - kChatBtnW - 16, kTitleH - 2 };
-            DrawTextW(hdc, L"LavenderHook", -1, &tr,
-                      DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+
+            // title text.
+            const int textLeft = cr.left + 14;
+            int dotCx = cr.left + (Polished() ? 14 : 12);
+            int dotCy = cr.top + kTitleH / 2;
+            int textX = textLeft;
+            if (Polished()) {
+                HBRUSH dot = CreateSolidBrush(g_colors.mid);
+                HPEN   dpen = CreatePen(PS_SOLID, 1, g_colors.mid);
+                HBRUSH od = (HBRUSH)SelectObject(hdc, dot);
+                HPEN   op = (HPEN)SelectObject(hdc, dpen);
+                Ellipse(hdc, dotCx - 3, dotCy - 3, dotCx + 3, dotCy + 3);
+                SelectObject(hdc, od); SelectObject(hdc, op);
+                DeleteObject(dot); DeleteObject(dpen);
+                textX = dotCx + 10;
+            }
+
+            HFONT oldFont = static_cast<HFONT>(SelectObject(hdc, TitleFont()));
+            // soft text shadow for depth
+            RECT trS = { textX + 1, cr.top + 1, cr.right - kChatBtnW - 16, cr.top + kTitleH };
+            SetTextColor(hdc, RGB(0, 0, 0));
+            DrawTextW(hdc, L"LavenderHook", -1, &trS, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+            RECT tr = { textX, cr.top, cr.right - kChatBtnW - 16, cr.top + kTitleH };
+            SetTextColor(hdc, Polished() ? LerpColor(g_colors.mid, RGB(255,255,255), 0.55f)
+                                         : g_colors.dark);
+            DrawTextW(hdc, L"LavenderHook", -1, &tr, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
             SelectObject(hdc, oldFont);
-            DeleteObject(font);
 
             // Chat button
             RECT btnRc;
             GetChatBtnRect(cr, btnRc);
-            HBRUSH btnBg = CreateSolidBrush(g_chatExpanded ? g_colors.main : g_colors.dark);
-            FillRect(hdc, &btnRc, btnBg);
-            DeleteObject(btnBg);
+            if (Polished()) {
+                COLORREF fill   = g_chatExpanded ? g_colors.main
+                                                 : LerpColor(g_colors.bg, g_colors.main, 0.28f);
+                COLORREF border = g_chatExpanded ? g_colors.mid : g_colors.main;
+                DrawPolishedPill(hdc, btnRc, fill, border, true);
+            }
+            else {
+                HBRUSH btnBg = CreateSolidBrush(g_chatExpanded ? g_colors.main : g_colors.dark);
+                FillRect(hdc, &btnRc, btnBg);
+                DeleteObject(btnBg);
+            }
 
+            HFONT oldBf = static_cast<HFONT>(SelectObject(hdc, ButtonFont()));
             SetTextColor(hdc, RGB(255, 255, 255));
             SetBkMode(hdc, TRANSPARENT);
-            DrawTextW(hdc, g_chatExpanded ? L"CHAT>" : L"CHAT", -1, &btnRc,
+            DrawTextW(hdc, g_chatExpanded ? L"CHAT \u25B8" : L"CHAT", -1, &btnRc,
                       DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+            SelectObject(hdc, oldBf);
         }
 
         static void DrawChatPanel(HDC hdc, const RECT& cr)
@@ -159,18 +327,26 @@ namespace LavenderHook {
             if (panelRc.bottom <= panelRc.top || panelRc.right <= panelRc.left)
                 return;
 
-            // Dark background (matches the active theme)
+            // Dark background
             HBRUSH bg = CreateSolidBrush(g_colors.bg);
             FillRect(hdc, &panelRc, bg);
             DeleteObject(bg);
 
-            // Top border line
-            HPEN sepPen = CreatePen(PS_SOLID, 1, g_colors.main);
-            HPEN oldPen = static_cast<HPEN>(SelectObject(hdc, sepPen));
-            MoveToEx(hdc, panelRc.left, panelRc.top, nullptr);
-            LineTo(hdc, panelRc.right, panelRc.top);
-            SelectObject(hdc, oldPen);
-            DeleteObject(sepPen);
+            // Top border line / bloom
+            if (Polished()) {
+                RECT bloom = { panelRc.left, panelRc.top, panelRc.right, panelRc.top + 1 };
+                HGradientStrip(hdc, bloom, g_colors.main, g_colors.bg);
+                RECT glow = { panelRc.left, panelRc.top + 1, panelRc.right, panelRc.top + 4 };
+                VGradient(hdc, glow, LerpColor(g_colors.bg, g_colors.main, 0.30f), g_colors.bg);
+            }
+            else {
+                HPEN sepPen = CreatePen(PS_SOLID, 1, g_colors.main);
+                HPEN oldPen = static_cast<HPEN>(SelectObject(hdc, sepPen));
+                MoveToEx(hdc, panelRc.left, panelRc.top, nullptr);
+                LineTo(hdc, panelRc.right, panelRc.top);
+                SelectObject(hdc, oldPen);
+                DeleteObject(sepPen);
+            }
 
             // Collect messages for display
             struct ChatLine {
@@ -202,20 +378,21 @@ namespace LavenderHook {
 
             if (chatLines.empty())
             {
+                HFONT oldEf = static_cast<HFONT>(SelectObject(hdc, ChatFont()));
                 SetBkMode(hdc, TRANSPARENT);
-                SetTextColor(hdc, RGB(100, 100, 100));
+                SetTextColor(hdc, Polished()
+                    ? LerpColor(g_colors.bg, RGB(255, 255, 255), 0.40f)
+                    : RGB(120, 120, 130));
                 RECT emptyRc = panelRc;
+                emptyRc.left += kChatPadX;
                 emptyRc.top += kChatPadY;
                 DrawTextW(hdc, L"No messages yet", -1, &emptyRc,
                           DT_LEFT | DT_TOP | DT_SINGLELINE);
+                SelectObject(hdc, oldEf);
                 return;
             }
 
-            HFONT font = CreateFontW(
-                16, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
-                DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
-                CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, L"Segoe UI");
-            HFONT oldFont = static_cast<HFONT>(SelectObject(hdc, font));
+            HFONT oldFont = static_cast<HFONT>(SelectObject(hdc, ChatFont()));
             SetBkMode(hdc, TRANSPARENT);
 
             const int panelW = panelRc.right - panelRc.left;
@@ -328,7 +505,6 @@ namespace LavenderHook {
             }
 
             SelectObject(hdc, oldFont);
-            DeleteObject(font);
         }
 
         // Fits the DWM thumbnail inside the border strips
@@ -431,7 +607,7 @@ namespace LavenderHook {
                     ? static_cast<int>(videoW / g_aspectRatio)
                     : 0;
 
-                // Compute chat panel from target dimensions, not current rect
+                // Compute chat panel from target dimensions
                 int chatExtra = 0;
                 if (g_chatExpanded)
                 {
@@ -508,7 +684,7 @@ namespace LavenderHook {
                                 SWP_NOZORDER | SWP_NOMOVE);
                         }
                         UpdateThumbnailRect(hwnd);
-                        ApplyWindowRgn(hwnd);
+                        ApplyWindowStyle(hwnd);
                         InvalidateRect(hwnd, nullptr, TRUE);
                         return 0;
                     }
@@ -532,6 +708,22 @@ namespace LavenderHook {
             case WM_TIMER:
                 if (wp == kChatTimerId)
                 {
+                    // Keep accent colors + DWM border in sync
+                    static bool     s_lastPolished = !Polished();
+                    static COLORREF s_lastMain = 0;
+                    COLORREF curMain = ImVecToColorref(MAIN_RED);
+                    if (s_lastPolished != Polished() || s_lastMain != curMain)
+                    {
+                        g_colors.bg = Polished() ? RGB(22, 20, 28) : RGB(18, 12, 28);
+                        g_colors.main = ImVecToColorref(MAIN_RED);
+                        g_colors.mid  = ImVecToColorref(MID_RED);
+                        g_colors.dark = ImVecToColorref(DARK_RED);
+                        ApplyWindowStyle(hwnd);
+                        InvalidateRect(hwnd, nullptr, FALSE);
+                        s_lastPolished = Polished();
+                        s_lastMain = curMain;
+                    }
+
                     RECT cr, panelRc;
                     GetClientRect(hwnd, &cr);
                     GetChatPanelRect(cr, panelRc);
@@ -541,7 +733,7 @@ namespace LavenderHook {
                 break;
 
             case WM_SIZE:
-                ApplyWindowRgn(hwnd);
+                ApplyWindowStyle(hwnd);
                 UpdateThumbnailRect(hwnd);
                 InvalidateRect(hwnd, nullptr, FALSE);
                 return 0;
@@ -571,7 +763,8 @@ namespace LavenderHook {
                 if (g_chatExpanded)
                     videoBottom -= GetChatPanelHeight(rc.bottom - rc.top);
 
-                HBRUSH vBr = CreateSolidBrush(g_colors.main);
+                // Accent frame around the live video.
+                HBRUSH vBr = CreateSolidBrush(Polished() ? g_colors.mid : g_colors.main);
                 RECT strip = { rc.left, rc.top + kTitleH,
                                rc.left + kVideoBorder, videoBottom };
                 FillRect(memDc, &strip, vBr);
@@ -583,15 +776,17 @@ namespace LavenderHook {
                 FillRect(memDc, &strip, vBr);
                 DeleteObject(vBr);
 
-                HPEN   bPen   = CreatePen(PS_INSIDEFRAME, kVideoBorder, g_colors.dark);
-                HPEN   oldPen = static_cast<HPEN>(SelectObject(memDc, bPen));
-                HBRUSH oldBr  = static_cast<HBRUSH>(
-                                    SelectObject(memDc, GetStockObject(NULL_BRUSH)));
-                RoundRect(memDc, rc.left, rc.top, rc.right, rc.bottom,
-                          kCornerR * 2, kCornerR * 2);
-                SelectObject(memDc, oldPen);
-                SelectObject(memDc, oldBr);
-                DeleteObject(bPen);
+                // accent glow just inside the video frame.
+                if (Polished()) {
+                    COLORREF glowC = LerpColor(g_colors.bg, g_colors.main, 0.45f);
+                    // left + right inner glow columns
+                    RECT gl = { rc.left + kVideoBorder, rc.top + kTitleH,
+                                rc.left + kVideoBorder + 2, videoBottom };
+                    HGradientStrip(memDc, gl, glowC, g_colors.bg);
+                    RECT gr2 = { rc.right - kVideoBorder - 2, rc.top + kTitleH,
+                                 rc.right - kVideoBorder, videoBottom };
+                    HGradientStrip(memDc, gr2, g_colors.bg, glowC);
+                }
 
                 DrawChatPanel(memDc, rc);
 
@@ -677,7 +872,7 @@ namespace LavenderHook {
                 return 1;
 
             g_chatBaseH = initH;
-            ApplyWindowRgn(hwnd);
+            ApplyWindowStyle(hwnd);
 
             if (g_gameHwnd &&
                 SUCCEEDED(DwmRegisterThumbnail(hwnd, g_gameHwnd, &g_thumbnail)))
@@ -688,6 +883,10 @@ namespace LavenderHook {
             g_overlayHwnd = hwnd;
             ShowWindow(hwnd, SW_SHOW);
             UpdateWindow(hwnd);
+
+            // Pull foreground focus away from the hidden game window.
+            SetForegroundWindow(hwnd);
+            SetActiveWindow(hwnd);
 
             MSG m{};
             BOOL bRet;
@@ -714,7 +913,7 @@ namespace LavenderHook {
                 return;
 
             g_colors.bg   = LavenderHook::Globals::use_polished_overlay
-                                ? RGB(22, 20, 28)   // frosted panel tone
+                                ? RGB(22, 20, 28)
                                 : RGB(18, 12, 28);
             g_colors.main = ImVecToColorref(MAIN_RED);
             g_colors.mid  = ImVecToColorref(MID_RED);
