@@ -21,6 +21,13 @@ extern ImVec4 MID_RED;
 extern ImVec4 DARK_RED;
 extern float WINDOW_BORDER_SIZE;
 
+static bool ColorsMatch(const ImVec4& a, const ImVec4& b, float epsilon = 0.001f) {
+    return (a.x > b.x - epsilon && a.x < b.x + epsilon) &&
+           (a.y > b.y - epsilon && a.y < b.y + epsilon) &&
+           (a.z > b.z - epsilon && a.z < b.z + epsilon) &&
+           (a.w > b.w - epsilon && a.w < b.w + epsilon);
+}
+
 static const ImVec4 DEF_MAIN_RED = ImVec4(0.6310878396034241f, 0.5130504965782166f, 0.7424892783164978f, 1.0f);
 static const ImVec4 DEF_MID_RED = ImVec4(0.7018406391143799f, 0.544309139251709f, 0.8454935550689697f, 1.0f);
 static const ImVec4 DEF_DARK_RED = ImVec4(0.7300597429275513f, 0.4847022593021393f, 0.9570815563201904f, 1.0f);
@@ -441,9 +448,11 @@ void LoadMenuSettings()
     }
 
     if (LavenderHook::Globals::use_polished_overlay) {
-        MAIN_RED = POLISHED_MAIN_RED;
-        MID_RED = POLISHED_MID_RED;
-        DARK_RED = POLISHED_DARK_RED;
+        if (ColorsMatch(MAIN_RED, DEF_MAIN_RED) && ColorsMatch(MID_RED, DEF_MID_RED) && ColorsMatch(DARK_RED, DEF_DARK_RED)) {
+            MAIN_RED = POLISHED_MAIN_RED;
+            MID_RED = POLISHED_MID_RED;
+            DARK_RED = POLISHED_DARK_RED;
+        }
     }
     ApplyThemeToImGui();
 }
@@ -916,13 +925,17 @@ namespace LavenderHook {
                         {
                             LavenderHook::Globals::use_polished_overlay = (current == 1);
                             if (current == 1) {
-                                MAIN_RED = POLISHED_MAIN_RED;
-                                MID_RED = POLISHED_MID_RED;
-                                DARK_RED = POLISHED_DARK_RED;
+                                if (ColorsMatch(MAIN_RED, DEF_MAIN_RED) && ColorsMatch(MID_RED, DEF_MID_RED) && ColorsMatch(DARK_RED, DEF_DARK_RED)) {
+                                    MAIN_RED = POLISHED_MAIN_RED;
+                                    MID_RED = POLISHED_MID_RED;
+                                    DARK_RED = POLISHED_DARK_RED;
+                                }
                             } else {
-                                MAIN_RED = DEF_MAIN_RED;
-                                MID_RED = DEF_MID_RED;
-                                DARK_RED = DEF_DARK_RED;
+                                if (ColorsMatch(MAIN_RED, POLISHED_MAIN_RED) && ColorsMatch(MID_RED, POLISHED_MID_RED) && ColorsMatch(DARK_RED, POLISHED_DARK_RED)) {
+                                    MAIN_RED = DEF_MAIN_RED;
+                                    MID_RED = DEF_MID_RED;
+                                    DARK_RED = DEF_DARK_RED;
+                                }
                             }
                             SaveMenuSettings();
                             ApplyThemeToImGui();
