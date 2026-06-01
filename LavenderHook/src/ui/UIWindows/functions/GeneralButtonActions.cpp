@@ -1,7 +1,6 @@
 ﻿#include "GeneralButtonActions.h"
 #include "../../../input/InputAutomation.h"
 #include "../../../misc/Globals.h"
-#include "../../../memory/Hooks.h"
 
 #include <chrono>
 #include <windows.h>
@@ -312,11 +311,9 @@ namespace LavenderHook {
                     if (!GetCursorPos(&pt)) return;
                     if (!ScreenToClient(hwnd, &pt)) return;
                     LPARAM lParam = MAKELPARAM(pt.x, pt.y);
-                    WNDPROC orig = LavenderHook::Hooks::WndProc::original_wndproc;
-                    if (!orig) return;
 
-                    CallWindowProcW(orig, hwnd, WM_LBUTTONDOWN, MK_LBUTTON, lParam);
-                    CallWindowProcW(orig, hwnd, WM_LBUTTONUP,   0,          lParam);
+                    PostMessage(hwnd, WM_LBUTTONDOWN, MK_LBUTTON, lParam);
+                    PostMessage(hwnd, WM_LBUTTONUP,   0,          lParam);
                 });
             }
 
