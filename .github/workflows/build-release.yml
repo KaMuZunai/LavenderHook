@@ -22,7 +22,7 @@ jobs:
       - name: Read Version File
         id: get_version
         run: |
-          $ver = (Get-Content HookVersion).Trim()
+          $ver = (Get-Content Version).Trim()
           echo "VERSION=$ver" >> $env:GITHUB_OUTPUT
         shell: powershell
 
