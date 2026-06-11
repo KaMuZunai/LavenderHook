@@ -215,7 +215,7 @@ Min - Deactivate when current mana drops below this value.
 Max - Reactivate when current mana exceeds this value (after cooldown).)")   
             .AddDropdownButton("Key:", &g_overchargePressKey)
             .AddDropdownButton("OC Key:", &g_overchargeSpamKey)
-            .AddDropdownTiming("OC Delay:", &g_overchargeSpamDelayMs, 50, 500)
+            .AddDropdownTiming("OC Delay:", &g_overchargeSpamDelayMs, 50, 10000)
             .AddDropdownTimingSeconds("CD:", &g_overchargeCooldownMs, 4000, 20000)
             .AddDropdownIntInput("Min:", &g_overchargeMinMana, 0, 100)
             .AddDropdownIntInput("Max:", &g_overchargeMaxMana, 0, 100)

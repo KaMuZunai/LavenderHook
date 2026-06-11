@@ -211,7 +211,7 @@ namespace LavenderHook {
                         state = State::COOLING;
                         cooldownStart = now;
                         stateStart = now;
-                    } else if ((now - stateStart) >= seconds(40)) {
+                    } else if ((now - stateStart) >= seconds(240)) {
                         // Guard: ability may not have activated — deactivate and cool down
                         PressVK(g_petBoost_key_vk);
                         state = State::COOLING;
@@ -281,7 +281,7 @@ namespace LavenderHook {
                         state = State::COOLING;
                         cooldownStart = now;
                         stateStart = now;
-                    } else if ((now - stateStart) >= seconds(40)) {
+                    } else if ((now - stateStart) >= seconds(240)) {
                         // Guard: ability may not have activated — deactivate and cool down
                         PressVK(g_wrathForm_key_vk);
                         state = State::COOLING;
@@ -365,7 +365,7 @@ namespace LavenderHook {
                         state = State::COOLING;
                         cooldownStart = now;
                         stateStart = now;
-                    } else if ((now - stateStart) >= seconds(40)) {
+                    } else if ((now - stateStart) >= seconds(240)) {
                         // Guard: mana not draining — deactivate and cool down
                         PressVK(g_overcharge_key_vk);
                         state = State::COOLING;

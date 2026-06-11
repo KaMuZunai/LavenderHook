@@ -173,6 +173,8 @@ static inline bool IsInputMessage(UINT msg) {
 
 LRESULT CALLBACK LavenderHook::Hooks::WndProc::HookedWndProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 {
+    ImGui_ImplWin32_WndProcHandler(hwnd, msg, wparam, lparam);
+
     // Toggle menu on Insert OR Ctrl + F1
     if (msg == WM_KEYDOWN &&
         (wparam == VK_INSERT ||
@@ -191,16 +193,13 @@ LRESULT CALLBACK LavenderHook::Hooks::WndProc::HookedWndProc(HWND hwnd, UINT msg
         }
 
         // ESC closes the menu when no hotkey binding is active.
+        // ImGui already processed the ESC above, so just close the menu.
         if (msg == WM_KEYDOWN && wparam == VK_ESCAPE &&
             !LavenderHook::UI::Lavender::IsAnyHotkeyListening())
         {
-            ImGui_ImplWin32_WndProcHandler(hwnd, msg, wparam, lparam);
             LavenderHook::Globals::show_menu = false;
             return 1;
         }
-
-        if (ImGui_ImplWin32_WndProcHandler(hwnd, msg, wparam, lparam))
-            return 1;
 
         if (IsInputMessage(msg))
             return 1;
