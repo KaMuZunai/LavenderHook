@@ -12,7 +12,6 @@
 #include "memory/hooks.h"
 #include "ui/components/console.h"
 #include "misc/logmonitor/LogMonitor.h"
-#include "updater/Updater.h"
 
 static void HideAndDetachConsole()
 {
@@ -42,8 +41,6 @@ BOOL CALLBACK EnumWindowsCallback(HWND hwnd, LPARAM)
 DWORD WINAPI CheatEntry(HMODULE hModule)
 {
     HideAndDetachConsole();
-
-    LavenderHook::Updater::RunUpdater();
 
     srand(static_cast<unsigned>(time(nullptr)));
 
