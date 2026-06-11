@@ -35,24 +35,8 @@ jobs:
         run: |
           cmake -B build-hook -S LavenderHook -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo
           cmake --build build-hook
-          cmake -B build-updater -S LavenderUpdater -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo
-          cmake --build build-updater
 
-      - name: Update Updater Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: LavenderHook
-          name: "LavenderHook ${{ steps.get_version.outputs.VERSION }} (Updater Support)"
-          body: "This release exists for updater compatibility. Use the 'Latest' release for manual downloads."
-          files: |
-            build-hook/LavenderHook.dll
-            build-updater/LavenderUpdater.dll
-          make_latest: "false"
-          prerelease: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Update Latest Release
+      - name: Update Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: latest
@@ -60,7 +44,6 @@ jobs:
           body: "Automated build of the latest version."
           files: |
             build-hook/LavenderHook.dll
-            build-updater/LavenderUpdater.dll
           make_latest: "true"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
