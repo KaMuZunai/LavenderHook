@@ -17,7 +17,6 @@ namespace LavenderHook::Input {
 
     void HoldVK(bool enabled, WORD vk, HoldState& state);
 
-    // Cadence helper
     template <class Duration, class Func>
     void TickEvery(bool enabled,
         std::chrono::steady_clock::time_point& last_fire,

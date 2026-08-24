@@ -1,92 +1,14 @@
 #include "hooks.h"
-#include "../ui/UIWindows/functions/MiscButtonActions.h"
-#include "../ui/UIWindows/TravelWindow.h"
 #include "../imgui/imgui.h"
 #include "../imgui/imgui_impl_win32.h"
-#include "../input/VirtualGamepad.h"
 #include "../ui/components/LavenderHotkey.h"
-#include <Xinput.h>
 
 LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 using namespace LavenderHook::Hooks::WndProc;
 
 static bool g_wndproc_hooked = false;
-
-// Keep original
 static WNDPROC g_saved_original = nullptr;
-
-// XInput block hook
-using XInputGetState_t = DWORD(WINAPI*)(DWORD, XINPUT_STATE*);
-static XInputGetState_t oXInputGetState = nullptr;
-static LPVOID g_xinput_target = nullptr;
-
-static LPVOID FindXInputGetState()
-{
-    static const char* const dlls[] = {
-        "xinput1_4.dll", "xinput1_3.dll", "xinput1_2.dll",
-        "xinput1_1.dll", "xinput9_1_0.dll"
-    };
-    for (auto& dll : dlls)
-    {
-        HMODULE hm = GetModuleHandleA(dll);
-        if (hm)
-        {
-            if (FARPROC fn = GetProcAddress(hm, "XInputGetState"))
-                return reinterpret_cast<LPVOID>(fn);
-        }
-    }
-    return nullptr;
-}
-
-// XInput user index
-static constexpr DWORD kVigemTargetSlot = 1;
-static DWORD g_frozen_packet[XUSER_MAX_COUNT] = {};
-static DWORD WINAPI hkXInputGetState(DWORD dwUserIndex, XINPUT_STATE* pState)
-{
-    const bool ourQuery = LavenderHook::Globals::xinput_our_query;
-
-    // Controller slot remapping
-    if (!ourQuery && LavenderHook::Input::VGamepad::Available())
-    {
-        DWORD vigemIdx = LavenderHook::Input::VGamepad::GetUserIndex();
-        if (vigemIdx < XUSER_MAX_COUNT && vigemIdx != kVigemTargetSlot)
-        {
-            if (dwUserIndex == kVigemTargetSlot)
-            {
-                DWORD result = oXInputGetState(vigemIdx, pState);
-                if (result == ERROR_SUCCESS &&
-                    LavenderHook::Globals::show_menu &&
-                    LavenderHook::Globals::simulate_unfocused &&
-                    !LavenderHook::Input::VGamepad::AutomationActive())
-                {
-                    ZeroMemory(&pState->Gamepad, sizeof(pState->Gamepad));
-                    if (dwUserIndex < XUSER_MAX_COUNT)
-                        pState->dwPacketNumber = g_frozen_packet[dwUserIndex];
-                }
-                return result;
-            }
-            if (dwUserIndex == vigemIdx)
-            {
-                ZeroMemory(pState, sizeof(XINPUT_STATE));
-                return ERROR_DEVICE_NOT_CONNECTED;
-            }
-        }
-    }
-
-    DWORD result = oXInputGetState(dwUserIndex, pState);
-    if (!ourQuery &&
-        result == ERROR_SUCCESS &&
-        LavenderHook::Globals::show_menu &&
-        LavenderHook::Globals::simulate_unfocused &&
-        !LavenderHook::Input::VGamepad::AutomationActive())
-    {
-        ZeroMemory(&pState->Gamepad, sizeof(pState->Gamepad));
-        if (dwUserIndex < XUSER_MAX_COUNT)
-            pState->dwPacketNumber = g_frozen_packet[dwUserIndex];
-    }
-    return result;
-}
 
 bool LavenderHook::Hooks::WndProc::Hook()
 {
@@ -96,7 +18,6 @@ bool LavenderHook::Hooks::WndProc::Hook()
         return false;
     }
 
-
     WNDPROC current = reinterpret_cast<WNDPROC>(GetWindowLongPtrW(hwnd, GWLP_WNDPROC));
 
     if (current == HookedWndProc) {
@@ -104,11 +25,9 @@ bool LavenderHook::Hooks::WndProc::Hook()
         return true;
     }
 
-    // Save original once
     if (!g_saved_original) g_saved_original = current;
     original_wndproc = g_saved_original;
 
-    // Install proc
     LONG_PTR prev = SetWindowLongPtrW(hwnd, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(HookedWndProc));
     if (prev == 0 && GetLastError() != 0) {
         LavenderConsole::GetInstance().Log("WndProc::Hook: SetWindowLongPtrW failed.");
@@ -116,16 +35,6 @@ bool LavenderHook::Hooks::WndProc::Hook()
     }
 
     g_wndproc_hooked = true;
-
-    // Install XInput block hook
-    if (!g_xinput_target)
-        g_xinput_target = FindXInputGetState();
-    if (g_xinput_target && !oXInputGetState)
-    {
-        MH_CreateHook(g_xinput_target, &hkXInputGetState, reinterpret_cast<LPVOID*>(&oXInputGetState));
-        MH_EnableHook(g_xinput_target);
-    }
-
     return true;
 }
 
@@ -141,13 +50,6 @@ bool LavenderHook::Hooks::WndProc::Unhook()
 
     original_wndproc = nullptr;
     g_wndproc_hooked = false;
-
-    if (g_xinput_target && oXInputGetState)
-    {
-        MH_DisableHook(g_xinput_target);
-        oXInputGetState = nullptr;
-    }
-
     return true;
 }
 
@@ -173,8 +75,6 @@ static inline bool IsInputMessage(UINT msg) {
 
 LRESULT CALLBACK LavenderHook::Hooks::WndProc::HookedWndProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 {
-    ImGui_ImplWin32_WndProcHandler(hwnd, msg, wparam, lparam);
-
     // Toggle menu on Insert OR Ctrl + F1
     if (msg == WM_KEYDOWN &&
         (wparam == VK_INSERT ||
@@ -192,32 +92,21 @@ LRESULT CALLBACK LavenderHook::Hooks::WndProc::HookedWndProc(HWND hwnd, UINT msg
             return 1;
         }
 
-        // ESC closes the menu when no hotkey binding is active.
-        // ImGui already processed the ESC above, so just close the menu.
+        // ESC closes the menu when no hotkey binding is active (ignore key repeats).
         if (msg == WM_KEYDOWN && wparam == VK_ESCAPE &&
+            !(lparam & 0x40000000) &&
             !LavenderHook::UI::Lavender::IsAnyHotkeyListening())
         {
+            ImGui_ImplWin32_WndProcHandler(hwnd, msg, wparam, lparam);
             LavenderHook::Globals::show_menu = false;
             return 1;
         }
 
+        if (ImGui_ImplWin32_WndProcHandler(hwnd, msg, wparam, lparam))
+            return 1;
+
         if (IsInputMessage(msg))
             return 1;
-    }
-
-    // Handle tray callback to restore hidden window
-    if (msg == LavenderHook::Globals::tray_callback_message) {
-        if (lparam == WM_LBUTTONUP || lparam == WM_RBUTTONUP) {
-            LavenderHook::Input::RestoreHiddenWindowFromTray();
-            return 0;
-        }
-    }
-
-    // Handle travel to main menu (posted from TravelWindow)
-    if (msg == LavenderHook::UI::Windows::TravelWindow::GetTravelMessageId())
-    {
-        LavenderHook::UI::Windows::TravelWindow::ExecuteTravel();
-        return 0;
     }
 
     if (g_saved_original)

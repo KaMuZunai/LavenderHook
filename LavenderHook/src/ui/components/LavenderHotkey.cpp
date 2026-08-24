@@ -18,7 +18,7 @@ namespace LavenderHook::UI::Lavender {
         const char* base = listening ? "..." : VkToString(*keyVK);
 
         char label[128];
-        snprintf(label, sizeof(label), "%s\xE2\x80\x8B##HK_%p", base, this);
+        snprintf(label, sizeof(label), "%s\xC2\xA0##HK_%p", base, this);
 
         if (Lavender::HotkeyButton(label, size))
         {

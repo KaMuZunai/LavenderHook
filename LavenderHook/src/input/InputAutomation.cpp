@@ -1,11 +1,9 @@
 #include "InputAutomation.h"
 #include "VkTable.h"
-#include "VirtualGamepad.h"
 #include "../misc/Globals.h"
 
 namespace LavenderHook::Input {
 
-    // Policy
     constexpr bool kRequireForeground = false;
 
     bool AutomationAllowed()
@@ -63,12 +61,6 @@ namespace LavenderHook::Input {
         if (!hwnd) return;
 
         if (LavenderHook::UI::Lavender::IsGamepadVk((int)vk)) {
-            // Prefer virtual gamepad if present
-            if (VGamepad::Initialize() && VGamepad::Available()) {
-                VGamepad::Press((int)vk);
-                return;
-            }
-
             WORD mapped = GamepadToKeyboard((int)vk);
             if (mapped) {
                 PostKey(hwnd, WM_KEYDOWN, mapped);
@@ -87,11 +79,6 @@ namespace LavenderHook::Input {
         if (!hwnd) return;
 
         if (LavenderHook::UI::Lavender::IsGamepadVk((int)vk)) {
-            if (VGamepad::Available()) {
-                VGamepad::Press((int)vk);
-                return;
-            }
-
             WORD mapped = GamepadToKeyboard((int)vk);
             if (mapped) {
                 PostKey(hwnd, WM_KEYDOWN, mapped);
@@ -110,11 +97,6 @@ namespace LavenderHook::Input {
         if (!hwnd) return;
 
         if (LavenderHook::UI::Lavender::IsGamepadVk((int)vk)) {
-            if (VGamepad::Initialize() && VGamepad::Available()) {
-                VGamepad::SetButton((int)vk, true);
-                VGamepad::Update();
-                return;
-            }
             WORD mapped = GamepadToKeyboard((int)vk);
             if (mapped) PostKey(hwnd, WM_KEYDOWN, mapped);
             return;
@@ -129,11 +111,6 @@ namespace LavenderHook::Input {
         if (!hwnd) return;
 
         if (LavenderHook::UI::Lavender::IsGamepadVk((int)vk)) {
-            if (VGamepad::Initialize() && VGamepad::Available()) {
-                VGamepad::SetButton((int)vk, false);
-                VGamepad::Update();
-                return;
-            }
             WORD mapped = GamepadToKeyboard((int)vk);
             if (mapped) PostKey(hwnd, WM_KEYUP, mapped);
             return;
@@ -142,7 +119,6 @@ namespace LavenderHook::Input {
         PostMessage(hwnd, WM_KEYUP, vk, (1 << 30) | (1 << 31));
     }
 
-    // Hold helper
     void HoldVK(bool enabled, WORD vk, HoldState& state)
     {
         if (!AutomationAllowed())

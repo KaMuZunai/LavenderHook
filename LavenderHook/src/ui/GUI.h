@@ -8,9 +8,6 @@
 
 extern float WINDOW_BORDER_SIZE;
 
-// Triggers the one-time startup tooltip (menu controls + version).
-void DisplayStartupToolTip();
-
 class GUI
 {
 public:

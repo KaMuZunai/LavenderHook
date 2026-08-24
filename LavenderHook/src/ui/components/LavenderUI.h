@@ -11,7 +11,7 @@ namespace LavenderHook::UI::Lavender {
     bool HotkeyButton(const char* shownText,
         const ImVec2& size = ImVec2(0, 0));
 
-    // Core Input widgets
+    // Core widgets
     bool Checkbox(const char* label, bool* v);
     bool SliderFloat(const char* label, float* v,
         float min, float max, const char* fmt = "%.3f",
@@ -20,7 +20,6 @@ namespace LavenderHook::UI::Lavender {
         int min, int max, const char* fmt = "%d",
         ImGuiSliderFlags flags = 0);
 
-	// Layout Helpers
     void Separator(float thickness = 1.0f);
 
     ImU32 PolishedAccent(float alpha = 1.0f);

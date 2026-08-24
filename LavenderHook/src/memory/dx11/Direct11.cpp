@@ -1,5 +1,6 @@
 #include "Direct11.h"
 #include "../hooks.h"
+#include "../dx12/Direct12.h"
 
 #include "../../imgui/imgui.h"
 #include "../../imgui/imgui_impl_win32.h"
@@ -9,12 +10,11 @@
 #include "../../misc/Globals.h"
 #include "../../ui/GUI.h"
 #include "../../ui/UIRegister.h"
-#include "../../ui/UIDispatch.h"
-#include "../../ui/components/console.h"
+#include "../../ui/UiDispatch.h"
+#include "../../ui/UIWindows/console.h"
 
 #include "../../ui/UIWindows/HoldToKillButton.h"
 #include "../../ui/UIWindows/ToggleMenuButton.h"
-#include "../../ui/UIWindows/TravelToMenuButton.h"
 
 #include "../../input/Hotkeys.h"
 
@@ -53,6 +53,7 @@ namespace {
     ID3D11Device* g_device = nullptr;
     ID3D11DeviceContext* g_context = nullptr;
     ID3D11RenderTargetView* g_rtv = nullptr;
+    ID3D11RasterizerState* g_wireframeRS = nullptr;
 
     // Hook state + retry management
     static std::atomic<bool> g_hooked{ false };
@@ -161,6 +162,13 @@ namespace {
         if (ImGui::GetCurrentContext())
             return;
 
+        // Detect DX12 - if so, delegate to DX12 path
+        if (LavenderHook::Hooks::Present12::IsDX12SwapChain(swap))
+        {
+            LavenderHook::Hooks::Present12::EnsureImGui12(swap);
+            return;
+        }
+
         if (!g_device || !g_context)
         {
             if (FAILED(swap->GetDevice(IID_PPV_ARGS(&g_device))))
@@ -176,6 +184,16 @@ namespace {
                 g_device
             );
             texture_loader_initialized = true;
+        }
+
+        // Create wireframe rasterizer state if needed
+        if (!g_wireframeRS)
+        {
+            D3D11_RASTERIZER_DESC rd{};
+            rd.FillMode = D3D11_FILL_WIREFRAME;
+            rd.CullMode = D3D11_CULL_NONE;
+            rd.DepthClipEnable = TRUE;
+            g_device->CreateRasterizerState(&rd, &g_wireframeRS);
         }
 
         if (ImGui::GetCurrentContext())
@@ -205,7 +223,6 @@ namespace {
         if (!ui_registered)
         {
             RegisterUIWindows();
-            DisplayStartupToolTip();
             ui_registered = true;
         }
     }
@@ -240,7 +257,6 @@ namespace {
         UIRegistry::Get().Render();
 
         LavenderHook::UI::Widgets::RenderMenuSelectorButton(LavenderHook::Globals::show_menu);
-        LavenderHook::UI::Widgets::RenderTravelToMenuButton(LavenderHook::Globals::show_menu);
         LavenderHook::UI::Widgets::RenderHoldToKillButton(LavenderHook::Globals::show_menu);
 
         if (LavenderHook::Globals::show_menu && gui)
@@ -385,13 +401,44 @@ LavenderHook::Hooks::Present11::original_resizebuffers = nullptr;
 HRESULT __stdcall HookedPresent(IDXGISwapChain* swap, UINT sync, UINT flags)
 {
     static bool once = false;
+    static bool is_dx12 = false;
     if (!once)
     {
-        LavenderConsole::GetInstance().Log("DX11: Present active.");
-        LavenderHook::Hooks::g_activeRenderer = LavenderHook::Hooks::RendererType::DX11;
+        // Detect DX12 vs DX11 once
+        is_dx12 = LavenderHook::Hooks::Present12::IsDX12SwapChain(swap);
+        if (is_dx12)
+        {
+            LavenderConsole::GetInstance().Log("DX12: Present active (via shared hook).");
+            LavenderHook::Hooks::g_activeRenderer = LavenderHook::Hooks::RendererType::DX12;
+        }
+        else
+        {
+            LavenderConsole::GetInstance().Log("DX11: Present active.");
+            LavenderHook::Hooks::g_activeRenderer = LavenderHook::Hooks::RendererType::DX11;
+        }
         once = true;
     }
 
+    // DX12 path
+    if (is_dx12)
+    {
+        LavenderHook::Hooks::Present12::SignalFirstPresent();
+
+        if (!LavenderHook::Hooks::Present12::HasGameCommandQueue())
+            return LavenderHook::Hooks::Present11::original_present(swap, sync, flags);
+
+        LavenderHook::Hooks::Present12::EnsureImGui12(swap);
+
+        if (ImGui::GetCurrentContext())
+            LavenderHook::Hooks::Present12::RenderUIFrame12(swap);
+
+        if (LavenderHook::Globals::debug_freeze)
+            return S_OK;
+
+        return LavenderHook::Hooks::Present11::original_present(swap, sync, flags);
+    }
+
+    // DX11 path
     EnsureImGui(swap);
 
     if (!g_rtv)
@@ -399,6 +446,16 @@ HRESULT __stdcall HookedPresent(IDXGISwapChain* swap, UINT sync, UINT flags)
 
     if (ImGui::GetCurrentContext())
         RenderUIFrame();
+
+    // Debug renderer state overrides
+    bool wireframe = LavenderHook::Globals::debug_wireframe;
+    if (wireframe && g_wireframeRS && g_context)
+        g_context->RSSetState(g_wireframeRS);
+    else if (g_context)
+        g_context->RSSetState(nullptr);
+
+    if (LavenderHook::Globals::debug_freeze)
+        return S_OK;
 
     return LavenderHook::Hooks::Present11::original_present(swap, sync, flags);
 }
@@ -409,6 +466,23 @@ HRESULT __stdcall HookedResizeBuffers(
     UINT BufferCount, UINT Width, UINT Height,
     DXGI_FORMAT NewFormat, UINT SwapChainFlags)
 {
+    // DX12 path
+    if (LavenderHook::Hooks::g_activeRenderer == LavenderHook::Hooks::RendererType::DX12)
+    {
+        LavenderHook::Hooks::Present12::OnResizeBuffers12();
+
+        auto hr = LavenderHook::Hooks::Present11::original_resizebuffers(
+            swap, BufferCount, Width, Height, NewFormat, SwapChainFlags);
+
+        if (SUCCEEDED(hr) && ImGui::GetCurrentContext())
+        {
+            LavenderHook::Hooks::Present12::OnResizeBuffers12();
+        }
+
+        return hr;
+    }
+
+    // DX11 path
     if (ImGui::GetCurrentContext())
     {
         ImGui_ImplDX11_InvalidateDeviceObjects();
@@ -475,6 +549,8 @@ void LavenderHook::Hooks::Present11::Unhook()
     }
 
     ReleaseRTV();
+
+    if (g_wireframeRS) { g_wireframeRS->Release(); g_wireframeRS = nullptr; }
 
     if (g_context) { g_context->Release(); g_context = nullptr; }
     if (g_device) { g_device->Release();  g_device = nullptr; }

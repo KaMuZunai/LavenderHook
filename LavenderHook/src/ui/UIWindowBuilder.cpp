@@ -268,6 +268,122 @@ UIWindowBuilder& UIWindowBuilder::AddButton(
     return *this;
 }
 
+UIWindowBuilder& UIWindowBuilder::AddColorEdit3(const char* label, float* value)
+{
+    UIItem item{};
+    item.type = UIItemType::ColorEdit3;
+    item.label = label;
+    item.color3 = value;
+    m_items.push_back(item);
+    return *this;
+}
+
+UIWindowBuilder& UIWindowBuilder::AddColorEdit4(const char* label, float* value)
+{
+    UIItem item{};
+    item.type = UIItemType::ColorEdit4;
+    item.label = label;
+    item.color4 = value;
+    m_items.push_back(item);
+    return *this;
+}
+
+UIWindowBuilder& UIWindowBuilder::AddCombo(const char* label, int* current, const char** items, int count)
+{
+    UIItem item{};
+    item.type = UIItemType::Combo;
+    item.label = label;
+    item.comboCurrent = current;
+    item.comboItems = items;
+    item.comboCount = count;
+    m_items.push_back(item);
+    return *this;
+}
+
+UIWindowBuilder& UIWindowBuilder::AddInputText(const char* label, char* buf, int bufSize)
+{
+    UIItem item{};
+    item.type = UIItemType::InputText;
+    item.label = label;
+    item.textBuf = buf;
+    item.textBufSize = bufSize;
+    m_items.push_back(item);
+    return *this;
+}
+
+UIWindowBuilder& UIWindowBuilder::AddInputInt(const char* label, int* value, int min, int max)
+{
+    UIItem item{};
+    item.type = UIItemType::InputInt;
+    item.label = label;
+    item.inputIntValue = value;
+    item.inputIntMin = min;
+    item.inputIntMax = max;
+    m_items.push_back(item);
+    return *this;
+}
+
+UIWindowBuilder& UIWindowBuilder::AddSeparator()
+{
+    UIItem item{};
+    item.type = UIItemType::Separator;
+    m_items.push_back(item);
+    return *this;
+}
+
+UIWindowBuilder& UIWindowBuilder::AddText(const char* text)
+{
+    UIItem item{};
+    item.type = UIItemType::Text;
+    item.textContent = text;
+    m_items.push_back(item);
+    return *this;
+}
+
+UIWindowBuilder& UIWindowBuilder::AddProgressBar(const char* label, float* value, float min, float max, const char* fmt)
+{
+    UIItem item{};
+    item.type = UIItemType::ProgressBar;
+    item.label = label;
+    item.progressValue = value;
+    item.progressMin = min;
+    item.progressMax = max;
+    item.progressFmt = fmt;
+    m_items.push_back(item);
+    return *this;
+}
+
+UIWindowBuilder& UIWindowBuilder::AddCheckbox(const char* label, bool* value)
+{
+    UIItem item{};
+    item.type = UIItemType::Checkbox;
+    item.label = label;
+    item.checkboxValue = value;
+    m_items.push_back(item);
+    return *this;
+}
+
+UIWindowBuilder& UIWindowBuilder::AddRadio(const char* label, int* value, const char** items, int count)
+{
+    UIItem item{};
+    item.type = UIItemType::Radio;
+    item.label = label;
+    item.radioValue = value;
+    item.radioLabels = items;
+    item.radioCount = count;
+    m_items.push_back(item);
+    return *this;
+}
+
+UIWindowBuilder& UIWindowBuilder::AddSpacer(float h)
+{
+    UIItem item{};
+    item.type = UIItemType::Spacer;
+    item.minF = h;
+    m_items.push_back(item);
+    return *this;
+}
+
 static float EaseInOut(float t)
 {
     t = ImClamp(t, 0.0f, 1.0f);
@@ -291,7 +407,24 @@ float UIWindowBuilder::ComputeHeight() const
 
     for (const auto& it : m_items)
     {
-                height += kRowHeight * s + polishedExtra;
+        switch (it.type) {
+        case UIItemType::Separator:
+            height += 8.0f * s;
+            break;
+        case UIItemType::Spacer:
+            height += it.minF * s;
+            break;
+        case UIItemType::Text:
+            height += ImGui::GetTextLineHeightWithSpacing();
+            break;
+        case UIItemType::Radio:
+            // Radio buttons take multiple rows
+            height += (float)it.radioCount * ImGui::GetFrameHeightWithSpacing();
+            break;
+        default:
+            height += kRowHeight * s + polishedExtra;
+            break;
+        }
 
         if (it.type == UIItemType::ToggleDropdown)
         {
@@ -992,13 +1125,6 @@ void UIWindowBuilder::Render(bool wantVisible)
                                         sec = std::round(sec * 10.0f) / 10.0f;
                                         *tr.valueMs = (int)(sec * 1000.0f);
                                     }
-                                    float wheel = ImGui::GetIO().MouseWheel;
-                                    if (wheel != 0.0f && ImGui::IsItemHovered()) {
-                                        sec += wheel * 0.1f;
-                                        sec = std::round(sec * 10.0f) / 10.0f;
-                                        sec = ImClamp(sec, tr.minMs / 1000.0f, tr.maxMs / 1000.0f);
-                                        *tr.valueMs = (int)(sec * 1000.0f);
-                                    }
                                 }
                                 else {
                                     ImGui::SliderInt(
@@ -1008,11 +1134,6 @@ void UIWindowBuilder::Render(bool wantVisible)
                                         tr.maxMs,
                                         "%dms"
                                     );
-                                    float wheel = ImGui::GetIO().MouseWheel;
-                                    if (wheel != 0.0f && ImGui::IsItemHovered()) {
-                                        *tr.valueMs += (int)(wheel > 0 ? 10 : -10);
-                                        *tr.valueMs = ImClamp(*tr.valueMs, tr.minMs, tr.maxMs);
-                                    }
                                 }
                             }
 
@@ -1152,7 +1273,7 @@ void UIWindowBuilder::Render(bool wantVisible)
 
                 case UIItemType::Button:
                 {
-                    bool btnHeld = false; // track via ImGui
+                    bool btnHeld = false;
                     if (Button(it.label, ImVec2(kButtonWidth * s, 0)) && it.onClick)
                         it.onClick();
                     if (polished && ImGui::IsItemActive()) {
@@ -1164,6 +1285,150 @@ void UIWindowBuilder::Render(bool wantVisible)
                                 0.60f * finalAlpha)),
                             ImGui::GetStyle().FrameRounding);
                     }
+                    break;
+                }
+
+                case UIItemType::ColorEdit3:
+                {
+                    float controlWidth = m_width * s - 24.0f * s;
+                    ImGui::SetNextItemWidth(controlWidth);
+                    if (ImGui::ColorEdit3(it.label, it.color3)) {
+                        if (it.onClick) it.onClick();
+                    }
+                    if (polished) {
+                        ImVec2 rMin = ImGui::GetItemRectMin();
+                        ImVec2 rMax = ImGui::GetItemRectMax();
+                        dl->AddRectFilled(rMin, ImVec2(rMax.x, rMin.y + (rMax.y - rMin.y) * 0.50f),
+                            IM_COL32(255, 255, 255, (int)(9.f * finalAlpha)),
+                            ImGui::GetStyle().FrameRounding, ImDrawFlags_RoundCornersTop);
+                    }
+                    break;
+                }
+
+                case UIItemType::ColorEdit4:
+                {
+                    float controlWidth = m_width * s - 24.0f * s;
+                    ImGui::SetNextItemWidth(controlWidth);
+                    if (ImGui::ColorEdit4(it.label, it.color4)) {
+                        if (it.onClick) it.onClick();
+                    }
+                    if (polished) {
+                        ImVec2 rMin = ImGui::GetItemRectMin();
+                        ImVec2 rMax = ImGui::GetItemRectMax();
+                        dl->AddRectFilled(rMin, ImVec2(rMax.x, rMin.y + (rMax.y - rMin.y) * 0.50f),
+                            IM_COL32(255, 255, 255, (int)(9.f * finalAlpha)),
+                            ImGui::GetStyle().FrameRounding, ImDrawFlags_RoundCornersTop);
+                    }
+                    break;
+                }
+
+                case UIItemType::Combo:
+                {
+                    float controlWidth = m_width * s - 24.0f * s;
+                    ImGui::SetNextItemWidth(controlWidth);
+                    if (it.comboCurrent && it.comboItems && it.comboCount > 0) {
+                        ImGui::Combo(it.label, it.comboCurrent, it.comboItems, it.comboCount);
+                    }
+                    if (polished) {
+                        ImVec2 rMin = ImGui::GetItemRectMin();
+                        ImVec2 rMax = ImGui::GetItemRectMax();
+                        dl->AddRectFilled(rMin, ImVec2(rMax.x, rMin.y + (rMax.y - rMin.y) * 0.50f),
+                            IM_COL32(255, 255, 255, (int)(9.f * finalAlpha)),
+                            ImGui::GetStyle().FrameRounding, ImDrawFlags_RoundCornersTop);
+                    }
+                    break;
+                }
+
+                case UIItemType::InputText:
+                {
+                    float controlWidth = m_width * s - 24.0f * s;
+                    ImGui::SetNextItemWidth(controlWidth);
+                    if (it.textBuf && it.textBufSize > 0) {
+                        ImGui::InputText(it.label, it.textBuf, it.textBufSize);
+                    }
+                    if (polished) {
+                        ImVec2 rMin = ImGui::GetItemRectMin();
+                        ImVec2 rMax = ImGui::GetItemRectMax();
+                        dl->AddRectFilled(rMin, ImVec2(rMax.x, rMin.y + (rMax.y - rMin.y) * 0.50f),
+                            IM_COL32(255, 255, 255, (int)(9.f * finalAlpha)),
+                            ImGui::GetStyle().FrameRounding, ImDrawFlags_RoundCornersTop);
+                    }
+                    break;
+                }
+
+                case UIItemType::InputInt:
+                {
+                    float controlWidth = m_width * s - 24.0f * s;
+                    ImGui::SetNextItemWidth(controlWidth);
+                    if (it.inputIntValue) {
+                        ImGui::InputInt(it.label, it.inputIntValue);
+                        if (it.inputIntMin != 0 || it.inputIntMax != 0) {
+                            *it.inputIntValue = ImClamp(*it.inputIntValue, it.inputIntMin, it.inputIntMax);
+                        }
+                    }
+                    if (polished) {
+                        ImVec2 rMin = ImGui::GetItemRectMin();
+                        ImVec2 rMax = ImGui::GetItemRectMax();
+                        dl->AddRectFilled(rMin, ImVec2(rMax.x, rMin.y + (rMax.y - rMin.y) * 0.50f),
+                            IM_COL32(255, 255, 255, (int)(9.f * finalAlpha)),
+                            ImGui::GetStyle().FrameRounding, ImDrawFlags_RoundCornersTop);
+                    }
+                    break;
+                }
+
+                case UIItemType::Separator:
+                {
+                    ImGui::Separator();
+                    break;
+                }
+
+                case UIItemType::Text:
+                {
+                    if (it.textContent) {
+                        ImGui::TextUnformatted(it.textContent);
+                    }
+                    break;
+                }
+
+                case UIItemType::ProgressBar:
+                {
+                    if (it.progressValue) {
+                        float fraction = (*it.progressValue - it.progressMin) /
+                            (it.progressMax - it.progressMin);
+                        fraction = ImClamp(fraction, 0.0f, 1.0f);
+                        float controlWidth = m_width * s - 24.0f * s;
+                        ImGui::SetNextItemWidth(controlWidth);
+                        ImGui::ProgressBar(fraction, ImVec2(-1, 0),
+                            it.progressFmt ? it.progressFmt : "");
+                    }
+                    break;
+                }
+
+                case UIItemType::Checkbox:
+                {
+                    if (it.checkboxValue) {
+                        ImGui::Checkbox(it.label, it.checkboxValue);
+                    }
+                    break;
+                }
+
+                case UIItemType::Radio:
+                {
+                    if (it.radioValue && it.radioLabels && it.radioCount > 0) {
+                        for (int i = 0; i < it.radioCount; i++) {
+                            if (ImGui::RadioButton(it.radioLabels[i], *it.radioValue == i)) {
+                                *it.radioValue = i;
+                            }
+                            if (i < it.radioCount - 1)
+                                ImGui::SameLine();
+                        }
+                    }
+                    break;
+                }
+
+                case UIItemType::Spacer:
+                {
+                    ImGui::Dummy(ImVec2(0, it.minF * s));
                     break;
                 }
                 }

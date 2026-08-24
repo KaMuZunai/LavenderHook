@@ -3,9 +3,6 @@
 #define DROP_LEFT   101
 #define DROP_DOWN   102
 
-// Menu Logo
-#define MENU_LOGO   103
-
 // Empty icon texture
 #define EMPTY_ICO   201
 
@@ -31,12 +28,18 @@
 #define ORB_GIRL		1007
 #define OWL_GIRL		1008
 
-// Sounds
+// Sounds (simple theme)
 #define TOGGLE_ON		2001
 #define TOGGLE_OFF		2002
 #define STOP_ON_FAIL	2003
 #define HIDE_NOTIF		2004
+
+// Sounds (polished theme)
 #define TOGGLE_ON_POLISHED		2005
 #define TOGGLE_OFF_POLISHED		2006
 #define STOP_ON_FAIL_POLISHED	2007
 #define HIDE_NOTIF_POLISHED		2008
+
+// Fonts
+#define FONT_OPEN_SANS_REGULAR	3001
+#define FONT_OPEN_SANS_SEMIBOLD	3002

@@ -3,6 +3,7 @@
 #include "components/LavenderFadeOut.h"
 #include "components/LavenderUI.h"
 #include "../misc/Globals.h"
+#include "../misc/FileLog.h"
 #include "../assets/TextureLoader.h"
 #include "../assets/resources/resource.h"
 #include "../sound/SoundPlayer.h"
@@ -83,6 +84,8 @@ void DisplayStartupToolTip()
     g_startup_fade.SetVisible(false);
 }
 
+static ImFont* LoadFontFromResource(int resId, float sizePixels);
+
 static std::string GetFileVersionString()
 {
     static std::string s;
@@ -156,9 +159,9 @@ namespace LavenderHook {
     }
 } // namespace LavenderHook::UI::Actions
 
-ImVec4 MAIN_RED = ImVec4(0.6310878396034241f, 0.5130504965782166f, 0.7424892783164978f, 1.0f);
-ImVec4 MID_RED = ImVec4(0.7018406391143799f, 0.544309139251709f, 0.8454935550689697f, 1.0f);
-ImVec4 DARK_RED = ImVec4(0.7300597429275513f, 0.4847022593021393f, 0.9570815563201904f, 1.0f);
+ImVec4 MAIN_RED = ImVec4(0.35f, 0.50f, 0.55f, 1.0f);
+ImVec4 MID_RED = ImVec4(0.40f, 0.60f, 0.70f, 1.0f);
+ImVec4 DARK_RED = ImVec4(0.50f, 0.75f, 0.85f, 1.0f);
 
 float WINDOW_BORDER_SIZE = 0.0f;
 
@@ -265,27 +268,17 @@ GUI::GUI()
     if (!fontLoaded) {
         ImGuiIO& io = ImGui::GetIO();
         io.ConfigFlags &= ~ImGuiConfigFlags_NavEnableKeyboard;
-        char modPath[MAX_PATH] = {0};
-        GetModuleFileNameA(LavenderHook::Globals::dll_module, modPath, MAX_PATH);
-        std::string baseDir(modPath);
-        size_t pos = baseDir.find_last_of("\\/");
-        if (pos != std::string::npos) baseDir = baseDir.substr(0, pos);
 
-        // Always load Segoe UI as fallback
-        char winDir[MAX_PATH]; size_t outlen = 0;
-        getenv_s(&outlen, winDir, sizeof(winDir), "WINDIR");
-        std::string segoePath = outlen > 0 ? std::string(winDir) + "\\Fonts\\segoeui.ttf" : "C:\\Windows\\Fonts\\segoeui.ttf";
-        io.Fonts->AddFontFromFileTTF(segoePath.c_str(), 24.0f);
-
-        // Load Segoe UI Semibold for polished theme (renders cleaner at larger sizes)
-        std::string semiboldPath = outlen > 0 ? std::string(winDir) + "\\Fonts\\seguisb.ttf" : "";
-        ImFont* semiboldFont = nullptr;
-        if (!semiboldPath.empty())
-            semiboldFont = io.Fonts->AddFontFromFileTTF(semiboldPath.c_str(), 24.0f);
+        // Fonts are embedded as DLL resources so the overlay renders identically
+        // on any system (including Linux/Proton) with no hardcoded path.
+        ImFont* regularFont = LoadFontFromResource(FONT_OPEN_SANS_REGULAR, 24.0f);
+        ImFont* semiboldFont = LoadFontFromResource(FONT_OPEN_SANS_SEMIBOLD, 24.0f);
 
         // Set default font based on theme
         if (semiboldFont && LavenderHook::Globals::use_polished_overlay)
             io.FontDefault = semiboldFont;
+        else if (regularFont)
+            io.FontDefault = regularFont;
         else if (io.Fonts->Fonts.Size >= 1)
             io.FontDefault = io.Fonts->Fonts[0];
 
@@ -327,8 +320,41 @@ static bool LoadTextureFromResource(int resId, Texture& outTex, ImTextureID& out
     return outId != 0;
 }
 
+static ImFont* LoadFontFromResource(int resId, float sizePixels)
+{
+    if (!ImGui::GetCurrentContext())
+        return nullptr;
+
+    HMODULE mod = nullptr;
+    GetModuleHandleEx(
+        GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
+        GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+        (LPCTSTR)&LoadFontFromResource,
+        &mod
+    );
+
+    HRSRC res = FindResource(mod, MAKEINTRESOURCE(resId), RT_RCDATA);
+    if (!res)
+        return nullptr;
+
+    HGLOBAL data = LoadResource(mod, res);
+    if (!data)
+        return nullptr;
+
+    void* ptr = LockResource(data);
+    DWORD size = SizeofResource(mod, res);
+    if (!ptr || size == 0)
+        return nullptr;
+
+    return ImGui::GetIO().Fonts->AddFontFromMemoryTTF(ptr, (int)size, sizePixels);
+}
+
 static void TryLoadTextures()
 {
+	static bool all_loaded = false;
+	if (all_loaded)
+		return;
+
 	struct TexEntry
 	{
 		int resId;
@@ -360,11 +386,17 @@ static void TryLoadTextures()
 		{ OWL_GIRL, &g_owlGirl, &g_owlGirlTex },
 	};
 
+	bool any_missing = false;
 	for (const auto& e : kTextures)
 	{
 		if (*e.id == 0)
+		{
+			any_missing = true;
 			LoadTextureFromResource(e.resId, *e.tex, *e.id);
+		}
 	}
+	if (!any_missing)
+		all_loaded = true;
 }
 
 
@@ -376,20 +408,21 @@ void GUI::RenderOverlay()
 {
     TryLoadTextures();
 
-    if (g_startup_show_start >= 0.0) {
+    // Startup tooltip: skip entirely after it has expired
+    static bool startup_done = false;
+    if (!startup_done && g_startup_show_start >= 0.0)
+    {
         double now = ImGui::GetTime();
         double elapsed = now - g_startup_show_start;
-        const double kDelay = 2.0; // seconds to wait before starting fade-in
-        const double kHold = 6.0; // seconds to keep visible after fade-in
-        bool wantVisible = false;
+        const double kDelay = 2.0;
+        const double kHold = 6.0;
 
-        if (elapsed >= kDelay && elapsed < (kDelay + kHold)) {
-            wantVisible = true;
-        }
+        bool wantVisible = (elapsed >= kDelay && elapsed < (kDelay + kHold));
 
         g_startup_fade.Tick(wantVisible);
 
-        if (g_startup_fade.ShouldRender()) {
+        if (g_startup_fade.ShouldRender())
+        {
             float a = g_startup_fade.Alpha();
             ImDrawList* fdl = ImGui::GetForegroundDrawList();
             ImVec2 ds = ImGui::GetIO().DisplaySize;
@@ -415,7 +448,8 @@ void GUI::RenderOverlay()
             ImVec2 p0 = pos;
             ImVec2 p1 = ImVec2(pos.x + boxW, pos.y + boxH);
 
-            if (polished) {
+            if (polished)
+            {
                 const float r = 8.0f;
                 ImU32 shadow = IM_COL32(0, 0, 0, (int)(85 * a));
                 fdl->AddRectFilled(ImVec2(p0.x + 1, p0.y + 3), ImVec2(p1.x + 1, p1.y + 4), shadow, r);
@@ -424,7 +458,8 @@ void GUI::RenderOverlay()
                     IM_COL32(255, 255, 255, (int)(10 * a)), r, ImDrawFlags_RoundCornersTop);
                 fdl->AddRect(p0, p1, LavenderHook::UI::Lavender::PolishedAccent(0.50f * a), r, 0, 1.f);
             }
-            else {
+            else
+            {
                 ImU32 bg = IM_COL32(20, 20, 20, (int)(200.0f * a));
                 ImU32 border = IM_COL32(80, 80, 80, (int)(200.0f * a));
                 fdl->AddRectFilled(p0, p1, bg, 8.0f);
@@ -438,6 +473,9 @@ void GUI::RenderOverlay()
             fdl->AddText(ImGui::GetFont(), ImGui::GetFontSize(), ImVec2(textPos.x, textPos.y + s0.y + s1.y + spacing * 2.0f), textCol, line2.c_str());
             fdl->AddText(ImGui::GetFont(), ImGui::GetFontSize(), ImVec2(textPos.x, textPos.y + s0.y + s1.y + s2.y + spacing * 3.0f), textCol, line3.c_str());
         }
+
+        if (elapsed > kDelay + kHold + 2.0)
+            startup_done = true;
     }
 
     // Info overlay rendering is handled by InfoOverlayWindow

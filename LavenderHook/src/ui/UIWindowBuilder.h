@@ -34,6 +34,17 @@ namespace LavenderHook::UI {
         SliderInt,
         SliderFloat,
         Button,
+        ColorEdit3,
+        ColorEdit4,
+        Combo,
+        InputText,
+        InputInt,
+        Separator,
+        Text,
+        ProgressBar,
+        Checkbox,
+        Radio,
+        Spacer,
     };
 
 
@@ -48,9 +59,9 @@ namespace LavenderHook::UI {
         int hotkeyShadow = 0;
         int hotkeyIndex = -1;
 
-        float arrowAnim = 0.0f; // 0 = closed, 1 = open
-        float dropdownAnim = 0.0f; // 0 = closed, 1 = open
-        float dropdownFade = 0.0f; // seconds
+        float arrowAnim = 0.0f;
+        float dropdownAnim = 0.0f;
+        float dropdownFade = 0.0f;
         float colorAnim = 0.0f;
 
         mutable float layoutHeight = 0.0f;
@@ -71,7 +82,42 @@ namespace LavenderHook::UI {
 
         std::function<void()> onClick;
         const char* description = nullptr;
-        float tooltipFade = 0.0f; // 0..1
+        float tooltipFade = 0.0f;
+
+        // ColorEdit
+        float* color3 = nullptr;
+        float* color4 = nullptr;
+
+        // Combo
+        const char** comboItems = nullptr;
+        int comboCount = 0;
+        int* comboCurrent = nullptr;
+
+        // InputText
+        char* textBuf = nullptr;
+        int textBufSize = 0;
+
+        // InputInt
+        int* inputIntValue = nullptr;
+        int inputIntMin = 0;
+        int inputIntMax = 0;
+
+        // Text
+        const char* textContent = nullptr;
+
+        // ProgressBar
+        float* progressValue = nullptr;
+        float progressMin = 0.0f;
+        float progressMax = 1.0f;
+        const char* progressFmt = nullptr;
+
+        // Checkbox
+        bool* checkboxValue = nullptr;
+
+        // Radio
+        int* radioValue = nullptr;
+        const char** radioLabels = nullptr;
+        int radioCount = 0;
     };
 
 
@@ -153,6 +199,19 @@ namespace LavenderHook::UI {
 
         UIWindowBuilder& AddItemDescription(const char* description);
 
+        // New element types
+        UIWindowBuilder& AddColorEdit3(const char* label, float* value);
+        UIWindowBuilder& AddColorEdit4(const char* label, float* value);
+        UIWindowBuilder& AddCombo(const char* label, int* current, const char** items, int count);
+        UIWindowBuilder& AddInputText(const char* label, char* buf, int bufSize);
+        UIWindowBuilder& AddInputInt(const char* label, int* value, int min = 0, int max = 0);
+        UIWindowBuilder& AddSeparator();
+        UIWindowBuilder& AddText(const char* text);
+        UIWindowBuilder& AddProgressBar(const char* label, float* value, float min = 0.0f, float max = 1.0f, const char* fmt = nullptr);
+        UIWindowBuilder& AddCheckbox(const char* label, bool* value);
+        UIWindowBuilder& AddRadio(const char* label, int* value, const char** items, int count);
+        UIWindowBuilder& AddSpacer(float h = 4.0f);
+
         void Render(bool wantVisible);
         UIWindowBuilder& SetHeaderIcon(ImTextureID icon);
 
@@ -170,7 +229,7 @@ namespace LavenderHook::UI {
 
         bool m_headerOpen = true;
         float m_headerArrowAnim = 1.0f;
-        float m_headerAnim = 1.0f;   // 0 = collapsed, 1 = expanded
+        float m_headerAnim = 1.0f;
 
 
         ImTextureID m_headerIcon = 0;

@@ -95,9 +95,7 @@ namespace LavenderHook::UI::Lavender {
             s_lastFrame = frame;
             for (DWORD i = 0; i < XUSER_MAX_COUNT; ++i)
             {
-                LavenderHook::Globals::xinput_our_query = true;
                 DWORD result = XInputGetState(i, &s_state[i]);
-                LavenderHook::Globals::xinput_our_query = false;
                 s_connected[i] = (result == ERROR_SUCCESS);
             }
         }

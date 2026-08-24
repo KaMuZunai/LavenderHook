@@ -2,6 +2,7 @@
 #include "../../misc/Globals.h"
 #include "../components/LavenderFadeOut.h"
 #include "../components/LavenderGradient.h"
+#include "../../net/NetworkMonitor.h"
 #include "../ActionsOverlay.h"
 
 #include "../../imgui/imgui.h"
@@ -135,14 +136,74 @@ namespace LavenderHook::UI::Windows {
                             IM_COL32(150, 142, 168, (int)(170.f * a)), label);
             };
 
+            using LavenderHook::Net::NetworkMonitor;
+            static double last_update_t = 0.0;
+            static int    disp_ping_ms  = -1;
+            static std::string disp_ip;
+
+            double now = ImGui::GetTime();
+            if (now - last_update_t >= 3.0) {
+                disp_ping_ms = NetworkMonitor::Instance().GetLastPingMs();
+                disp_ip      = NetworkMonitor::Instance().GetTopIp();
+                last_update_t = now;
+            }
+
             static double prevTime = ImGui::GetTime();
             float dt = (float)(ImGui::GetTime() - prevTime);
             prevTime = ImGui::GetTime();
 
+            struct SimpleAnim { float alpha = 0.f, slide = 60.f; bool visible = false; };
+            static SimpleAnim serverAnim, pingAnim;
+
+            auto TickSimpleAnim = [&](SimpleAnim& a, bool show) {
+                if (show) {
+                    a.alpha += (1.f - a.alpha) * std::clamp(10.f * dt, 0.f, 1.f);
+                    a.slide += (0.f - a.slide) * std::clamp(10.f * dt, 0.f, 1.f);
+                } else {
+                    a.alpha += (0.f - a.alpha) * std::clamp(8.f * dt, 0.f, 1.f);
+                    a.slide += (80.f - a.slide) * std::clamp(8.f * dt, 0.f, 1.f);
+                }
+                a.visible = a.alpha > 0.02f;
+            };
+
+            TickSimpleAnim(serverAnim, LavenderHook::Globals::show_server);
+            TickSimpleAnim(pingAnim,   LavenderHook::Globals::show_ping);
+
             const float rightEdge = screenW - kMargin;
             float cursorY = kMargin;
 
-            bool sessionVisible = false;
+            bool sessionVisible = serverAnim.visible || pingAnim.visible;
+            if (sessionVisible) {
+                DrawHeader(rightEdge, cursorY, "SESSION",
+                           alpha * std::max(serverAnim.alpha, pingAnim.alpha));
+                cursorY += lineH + kHeaderGap;
+            }
+
+            if (serverAnim.visible) {
+                std::string server = "Server: ";
+                server += disp_ip.empty() ? "unknown" : disp_ip;
+
+                float pw = PillWidth(server, false);
+                DrawPill(ImVec2(rightEdge - pw + serverAnim.slide, cursorY),
+                         server, alpha * serverAnim.alpha, 0);
+                cursorY += itemH + kItemSpacing;
+            }
+
+            if (pingAnim.visible) {
+                std::string ping = "Ping: ";
+                ping += (disp_ping_ms >= 0) ? std::to_string(disp_ping_ms) + " ms" : "--";
+
+                ImU32 dotCol;
+                if (disp_ping_ms < 0)        dotCol = IM_COL32(120, 120, 130, 255);
+                else if (disp_ping_ms < 60)  dotCol = IM_COL32(120, 220, 130, 255);
+                else if (disp_ping_ms < 120) dotCol = IM_COL32(240, 200, 90, 255);
+                else                         dotCol = IM_COL32(235, 110, 110, 255);
+
+                float pw = PillWidth(ping, true);
+                DrawPill(ImVec2(rightEdge - pw + pingAnim.slide, cursorY),
+                         ping, alpha * pingAnim.alpha, dotCol);
+                cursorY += itemH + kItemSpacing;
+            }
 
             auto activeRaw = LavenderHook::UI::Actions::GetActiveList();
 
@@ -257,10 +318,80 @@ namespace LavenderHook::UI::Windows {
                     Lavender::GradientText(text, a);
                 };
 
+            using LavenderHook::Net::NetworkMonitor;
+
+            static double last_update_t = 0.0;
+            static int disp_ping_ms = -1;
+            static std::string disp_ip;
+
+            double now = ImGui::GetTime();
+            if (now - last_update_t >= 3.0)
+            {
+                disp_ping_ms = NetworkMonitor::Instance().GetLastPingMs();
+                disp_ip = NetworkMonitor::Instance().GetTopIp();
+                last_update_t = now;
+            }
+
+            struct SimpleAnim { float alpha = 0.f, slide = 60.f; bool visible = false; };
+            static SimpleAnim serverAnim, pingAnim;
+
             static double prevTime = ImGui::GetTime();
             float dt = (float)(ImGui::GetTime() - prevTime);
             prevTime = ImGui::GetTime();
 
+            auto TickSimpleAnim = [&](SimpleAnim& a, bool show)
+                {
+                    if (show) {
+                        a.alpha += (1.f - a.alpha) * std::clamp(10.f * dt, 0.f, 1.f);
+                        a.slide += (0.f - a.slide) * std::clamp(10.f * dt, 0.f, 1.f);
+                    }
+                    else {
+                        a.alpha += (0.f - a.alpha) * std::clamp(8.f * dt, 0.f, 1.f);
+                        a.slide += (80.f - a.slide) * std::clamp(8.f * dt, 0.f, 1.f);
+                    }
+                    a.visible = a.alpha > 0.02f;
+                };
+
+            TickSimpleAnim(serverAnim, LavenderHook::Globals::show_server);
+            TickSimpleAnim(pingAnim, LavenderHook::Globals::show_ping);
+
+            if (serverAnim.visible)
+            {
+                std::string server = "Server: ";
+                server += disp_ip.empty() ? "unknown" : disp_ip;
+
+                float w = ImGui::CalcTextSize(server.c_str()).x;
+                DrawTextBg(
+                    ImVec2(
+                        screenW - w - margin - 18.f + serverAnim.slide,
+                        cursorY
+                    ),
+                    server,
+                    alpha * serverAnim.alpha
+                );
+                cursorY += itemH + itemSpacing;
+            }
+
+            if (pingAnim.visible)
+            {
+                std::string ping = "Ping: ";
+                ping += (disp_ping_ms >= 0)
+                    ? std::to_string(disp_ping_ms) + " ms"
+                    : "--";
+
+                float w = ImGui::CalcTextSize(ping.c_str()).x;
+                DrawTextBg(
+                    ImVec2(
+                        screenW - w - margin - 18.f + pingAnim.slide,
+                        cursorY
+                    ),
+                    ping,
+                    alpha * pingAnim.alpha
+                );
+                cursorY += itemH + itemSpacing;
+            }
+
+            cursorY += 12.f;
             float actionsBaseY = cursorY;
 
             auto activeRaw = LavenderHook::UI::Actions::GetActiveList();

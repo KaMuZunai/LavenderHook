@@ -6,8 +6,8 @@
 namespace LavenderHook::UI::Lavender {
 
     struct Hotkey {
-        const char* label;	// display name
-        int* keyVK;			// binds directly to item storage
+        const char* label;   // display name
+        int* keyVK;          // binds directly to item storage
 
         bool listening = false;
         bool suppress_once = false;
@@ -21,13 +21,15 @@ namespace LavenderHook::UI::Lavender {
 
         std::unordered_map<int, bool> keyEdge;
 
+        // Draw UI
         bool Render(const ImVec2& size = ImVec2(70, 0));
 
+        // Update toggling behavior
         void UpdateToggle(bool& toggleState);
     };
 
-    const char* VkToString(int vk);	// exposed for displaying names
-    bool IsAnyHotkeyListening();	// true while any hotkey button is capturing input
-    extern bool g_hotkey_binding_active;
+    const char* VkToString(int vk); // exposed for displaying names
+    bool IsAnyHotkeyListening();     // true while any hotkey button is capturing input
+    extern bool g_hotkey_binding_active; // true while a hotkey bind is in progress
 
 }

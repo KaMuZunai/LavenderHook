@@ -3,7 +3,6 @@
 #include <Windows.h>
 #include <dxgi1_4.h>
 #include <d3d11.h>
-#include <d3d12.h>
 #include <iostream>
 
 #include "../minhook/MinHook.h"
@@ -15,14 +14,17 @@
 #include "../imgui/imgui_impl_win32.h"
 
 #include "../ui/GUI.h"
-#include "../ui/components/console.h"
+#include "../ui/UIWindows/console.h"
 
 namespace LavenderHook::Hooks
 {
     enum class RendererType
     {
         None,
-        DX11
+        DX11,
+        DX9,
+        DX12,
+        OpenGL
     };
 
     extern RendererType g_activeRenderer;
@@ -32,6 +34,30 @@ namespace LavenderHook::Hooks
     bool Unhook();
 
     namespace Present11
+    {
+        bool Hook();
+        void Unhook();
+    };
+
+    namespace EndScene9
+    {
+        bool Hook();
+        void Unhook();
+    };
+
+    namespace Present12
+    {
+        bool Hook();
+        void Unhook();
+    };
+
+    namespace OpenGL
+    {
+        bool Hook();
+        void Unhook();
+    };
+
+    namespace Timing
     {
         bool Hook();
         void Unhook();

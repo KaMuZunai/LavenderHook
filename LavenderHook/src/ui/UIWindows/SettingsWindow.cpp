@@ -1,10 +1,10 @@
 #include "SettingsWindow.h"
 #include "../../misc/Globals.h"
+#include "../../misc/FileLog.h"
 #include "../../config/ConfigManager.h"
 #include "../../sound/SoundPlayer.h"
 #include "../../imgui/imgui.h"
-#include "../components/console.h"
-#include "../../webhook/WebhookManager.h"
+#include "console.h"
 #include "../components/LavenderFadeOut.h"
 #include "../components/LavenderUI.h"
 #include "../components/LavenderWindowHeader.h"
@@ -21,18 +21,12 @@ extern ImVec4 MID_RED;
 extern ImVec4 DARK_RED;
 extern float WINDOW_BORDER_SIZE;
 
-static bool ColorsMatch(const ImVec4& a, const ImVec4& b, float epsilon = 0.001f) {
-    return (a.x > b.x - epsilon && a.x < b.x + epsilon) &&
-           (a.y > b.y - epsilon && a.y < b.y + epsilon) &&
-           (a.z > b.z - epsilon && a.z < b.z + epsilon) &&
-           (a.w > b.w - epsilon && a.w < b.w + epsilon);
-}
+// Old theme (previously "Default")
+static const ImVec4 OLD_MAIN_RED = ImVec4(0.6310878396034241f, 0.5130504965782166f, 0.7424892783164978f, 1.0f);
+static const ImVec4 OLD_MID_RED = ImVec4(0.7018406391143799f, 0.544309139251709f, 0.8454935550689697f, 1.0f);
+static const ImVec4 OLD_DARK_RED = ImVec4(0.7300597429275513f, 0.4847022593021393f, 0.9570815563201904f, 1.0f);
 
-static const ImVec4 DEF_MAIN_RED = ImVec4(0.6310878396034241f, 0.5130504965782166f, 0.7424892783164978f, 1.0f);
-static const ImVec4 DEF_MID_RED = ImVec4(0.7018406391143799f, 0.544309139251709f, 0.8454935550689697f, 1.0f);
-static const ImVec4 DEF_DARK_RED = ImVec4(0.7300597429275513f, 0.4847022593021393f, 0.9570815563201904f, 1.0f);
-
-// Polished theme (matches the high overlay design)
+// Polished theme (now default)
 static const ImVec4 POLISHED_MAIN_RED = ImVec4(0.35f, 0.50f, 0.55f, 1.0f);
 static const ImVec4 POLISHED_MID_RED = ImVec4(0.40f, 0.60f, 0.70f, 1.0f);
 static const ImVec4 POLISHED_DARK_RED = ImVec4(0.50f, 0.75f, 0.85f, 1.0f);
@@ -164,7 +158,9 @@ static bool DropdownArrowCustom(
 
 
 static std::string GetConfigDir() {
-    return LavenderHook::Config::GetBaseDir();
+    std::string dir = LavenderHook::Config::GetBaseDir();
+    CreateDirectoryA(dir.c_str(), nullptr);
+    return dir;
 }
 
 static std::string GetThemePath() {
@@ -357,31 +353,16 @@ static void SaveMenuSettings()
     if (!f) return;
 
     f << "show_info_overlay=" << BoolToStr(LavenderHook::Globals::show_info_overlay) << "\n";
-    f << "show_general_window=" << BoolToStr(LavenderHook::Globals::show_general_window) << "\n";
-    f << "show_misc_window=" << BoolToStr(LavenderHook::Globals::show_misc_window) << "\n";
-    f << "show_buffing_window=" << BoolToStr(LavenderHook::Globals::show_buffing_window) << "\n";
-    f << "show_profiles_window=" << BoolToStr(LavenderHook::Globals::show_profiles_window) << "\n";
-    f << "show_macro_window=" << BoolToStr(LavenderHook::Globals::show_macro_window) << "\n";
-    f << "show_gamepad_window=" << BoolToStr(LavenderHook::Globals::show_gamepad_window) << "\n";
-    f << "show_paragon_level_window=" << BoolToStr(LavenderHook::Globals::show_paragon_level_window) << "\n";
-    f << "show_wave_window=" << BoolToStr(LavenderHook::Globals::show_wave_window) << "\n";
-    f << "show_wiki_window=" << BoolToStr(LavenderHook::Globals::show_wiki_window) << "\n";
+    f << "show_ping=" << BoolToStr(LavenderHook::Globals::show_ping) << "\n";
+    f << "show_server=" << BoolToStr(LavenderHook::Globals::show_server) << "\n";
+    f << "show_debug_window=" << BoolToStr(LavenderHook::Globals::show_debug_window) << "\n";
     f << "show_console=" << BoolToStr(LavenderHook::Globals::show_console) << "\n";
     f << "show_menu_logo=" << BoolToStr(LavenderHook::Globals::show_menu_logo) << "\n";
-    f << "show_process_overlay_on_hide=" << BoolToStr(LavenderHook::Globals::show_process_overlay_on_hide) << "\n";
-    f << "stop_on_fail=" << BoolToStr(LavenderHook::Globals::stop_on_fail) << "\n";
+    f << "show_profiles_window=" << BoolToStr(LavenderHook::Globals::show_profiles_window) << "\n";
     f << "mute_buttons=" << BoolToStr(LavenderHook::Globals::mute_buttons) << "\n";
-    f << "mute_fail=" << BoolToStr(LavenderHook::Globals::mute_fail) << "\n";
     f << "sound_volume=" << LavenderHook::Globals::sound_volume << "\n";
     f << "menu_scale=" << LavenderHook::Globals::menu_scale << "\n";
     f << "use_polished_overlay=" << BoolToStr(LavenderHook::Globals::use_polished_overlay) << "\n";
-
-    f << "webhook_url=" << LavenderHook::Webhook::url << "\n";
-    f << "webhook_user_id=" << LavenderHook::Webhook::user_id << "\n";
-    f << "webhook_map_finished_enabled=" << BoolToStr(LavenderHook::Webhook::map_finished_enabled) << "\n";
-    f << "webhook_core_destroyed_enabled=" << BoolToStr(LavenderHook::Webhook::core_destroyed_enabled) << "\n";
-    f << "webhook_map_finished_msg=" << LavenderHook::Webhook::map_finished_msg << "\n";
-    f << "webhook_core_destroyed_msg=" << LavenderHook::Webhook::core_destroyed_msg << "\n";
 }
 
 void LoadMenuSettings()
@@ -404,23 +385,15 @@ void LoadMenuSettings()
                 WINDOW_BORDER_SIZE = std::stof(line.substr(eq + 1));
         }
 
-        if (line.rfind("stop_on_fail", 0) == 0)       ReadBool(line, LavenderHook::Globals::stop_on_fail);
         if (line.rfind("mute_buttons", 0) == 0)       ReadBool(line, LavenderHook::Globals::mute_buttons);
-        if (line.rfind("mute_fail", 0) == 0)          ReadBool(line, LavenderHook::Globals::mute_fail);
 
         if (line.rfind("show_info_overlay", 0) == 0)         ReadBool(line, LavenderHook::Globals::show_info_overlay);
-        if (line.rfind("show_general_window", 0) == 0)       ReadBool(line, LavenderHook::Globals::show_general_window);
-        if (line.rfind("show_misc_window", 0) == 0)          ReadBool(line, LavenderHook::Globals::show_misc_window);
-        if (line.rfind("show_buffing_window", 0) == 0)       ReadBool(line, LavenderHook::Globals::show_buffing_window);
-        if (line.rfind("show_profiles_window", 0) == 0)      ReadBool(line, LavenderHook::Globals::show_profiles_window);
-        if (line.rfind("show_macro_window", 0) == 0)         ReadBool(line, LavenderHook::Globals::show_macro_window);
-        if (line.rfind("show_gamepad_window", 0) == 0)       ReadBool(line, LavenderHook::Globals::show_gamepad_window);
-        if (line.rfind("show_paragon_level_window", 0) == 0) ReadBool(line, LavenderHook::Globals::show_paragon_level_window);
-        if (line.rfind("show_wave_window", 0) == 0)          ReadBool(line, LavenderHook::Globals::show_wave_window);
-        if (line.rfind("show_wiki_window", 0) == 0)          ReadBool(line, LavenderHook::Globals::show_wiki_window);
+        if (line.rfind("show_ping", 0) == 0)                 ReadBool(line, LavenderHook::Globals::show_ping);
+        if (line.rfind("show_server", 0) == 0)               ReadBool(line, LavenderHook::Globals::show_server);
+        if (line.rfind("show_debug_window", 0) == 0)         ReadBool(line, LavenderHook::Globals::show_debug_window);
         if (line.rfind("show_console", 0) == 0)              ReadBool(line, LavenderHook::Globals::show_console);
         if (line.rfind("show_menu_logo", 0) == 0)            ReadBool(line, LavenderHook::Globals::show_menu_logo);
-        if (line.rfind("show_process_overlay_on_hide", 0) == 0) ReadBool(line, LavenderHook::Globals::show_process_overlay_on_hide);
+        if (line.rfind("show_profiles_window", 0) == 0)      ReadBool(line, LavenderHook::Globals::show_profiles_window);
         if (line.rfind("sound_volume", 0) == 0) {
             size_t eq = line.find('=');
             if (eq != std::string::npos)
@@ -432,27 +405,12 @@ void LoadMenuSettings()
                 LavenderHook::Globals::menu_scale = std::stof(line.substr(eq + 1));
         }
         if (line.rfind("use_polished_overlay", 0) == 0)  ReadBool(line, LavenderHook::Globals::use_polished_overlay);
-
-        auto ReadStr = [&](std::string& out) {
-            size_t eq = line.find('=');
-            if (eq == std::string::npos) return;
-            if (line.size() > eq + 1) out = line.substr(eq + 1);
-            else out.clear();
-        };
-        if (line.rfind("webhook_url", 0) == 0)                  ReadStr(LavenderHook::Webhook::url);
-        if (line.rfind("webhook_user_id", 0) == 0)              ReadStr(LavenderHook::Webhook::user_id);
-        if (line.rfind("webhook_map_finished_enabled", 0) == 0) ReadBool(line, LavenderHook::Webhook::map_finished_enabled);
-        if (line.rfind("webhook_core_destroyed_enabled", 0) == 0) ReadBool(line, LavenderHook::Webhook::core_destroyed_enabled);
-        if (line.rfind("webhook_map_finished_msg", 0) == 0)     ReadStr(LavenderHook::Webhook::map_finished_msg);
-        if (line.rfind("webhook_core_destroyed_msg", 0) == 0)   ReadStr(LavenderHook::Webhook::core_destroyed_msg);
     }
 
     if (LavenderHook::Globals::use_polished_overlay) {
-        if (ColorsMatch(MAIN_RED, DEF_MAIN_RED) && ColorsMatch(MID_RED, DEF_MID_RED) && ColorsMatch(DARK_RED, DEF_DARK_RED)) {
-            MAIN_RED = POLISHED_MAIN_RED;
-            MID_RED = POLISHED_MID_RED;
-            DARK_RED = POLISHED_DARK_RED;
-        }
+        MAIN_RED = POLISHED_MAIN_RED;
+        MID_RED = POLISHED_MID_RED;
+        DARK_RED = POLISHED_DARK_RED;
     }
     ApplyThemeToImGui();
 }
@@ -542,18 +500,17 @@ static const SettingsCheckbox kPerfCheckboxes[] = {
 };
 static const int kPerfCount = sizeof(kPerfCheckboxes) / sizeof(kPerfCheckboxes[0]);
 
+static const SettingsCheckbox kInfoCheckboxes[] = {
+    {"Server", &LavenderHook::Globals::show_server},
+    {"Ping", &LavenderHook::Globals::show_ping},
+};
+static const int kInfoCount = sizeof(kInfoCheckboxes) / sizeof(kInfoCheckboxes[0]);
+
 static const SettingsCheckbox kWindowCheckboxes[] = {
-    {"General Window", &LavenderHook::Globals::show_general_window},
-    {"Misc Window", &LavenderHook::Globals::show_misc_window},
-    {"Buffing Window", &LavenderHook::Globals::show_buffing_window},
-    {"Virtual Controller", &LavenderHook::Globals::show_gamepad_window},
-    {"Profiles Window", &LavenderHook::Globals::show_profiles_window},
-    {"Macro Manager", &LavenderHook::Globals::show_macro_window},
-    {"Mastery Level", &LavenderHook::Globals::show_paragon_level_window},
-    {"Wave Overlay", &LavenderHook::Globals::show_wave_window},
-    {"Lavender Wiki", &LavenderHook::Globals::show_wiki_window},
+    {"Debug Window", &LavenderHook::Globals::show_debug_window},
     {"Console", &LavenderHook::Globals::show_console},
     {"Menu Logo", &LavenderHook::Globals::show_menu_logo},
+    {"Profiles", &LavenderHook::Globals::show_profiles_window},
 };
 static const int kWindowCount = sizeof(kWindowCheckboxes) / sizeof(kWindowCheckboxes[0]);
 
@@ -598,6 +555,7 @@ namespace LavenderHook {
                     };
 
                 DriveAnim(s_perfAnim, expand_performance);
+                DriveAnim(s_infoOverlayAnim, expand_info_overlay);
                 DriveAnim(s_windowsAnim, expand_windows);
 
                 ImGui::SetNextWindowSize(
@@ -639,7 +597,7 @@ namespace LavenderHook {
                 {
                     float ha = alpha * s_headerAnim;
 
-                    // Info Overlay
+                    // Info Overlay — expandable with Server/Ping sub-options
                     {
                         bool b = LavenderHook::Globals::show_info_overlay;
                         if (ImGui::Checkbox("Info Overlay", &b)) {
@@ -647,26 +605,26 @@ namespace LavenderHook {
                             SaveMenuSettings();
                             LavenderHook::Audio::PlayToggleSound(b);
                         }
-                    }
+                        if (DropdownArrowCustom("info", expand_info_overlay, s_infoArrowAnim, alpha))
+                            expand_info_overlay = !expand_info_overlay;
 
-                    // Process Overlay on Hide
-                    {
-                        bool b = LavenderHook::Globals::show_process_overlay_on_hide;
-                        if (ImGui::Checkbox("Process Overlay on Hide", &b)) {
-                            LavenderHook::Globals::show_process_overlay_on_hide = b;
-                            SaveMenuSettings();
-                            LavenderHook::Audio::PlayToggleSound(b);
-                        }
-                    }
+                        CollapsibleBegin("##info_section", s_infoOverlayAnim, kInfoCount);
+                        ImGui::Indent(18.f);
 
-                    // Stop on Fail
-                    {
-                        bool b = LavenderHook::Globals::stop_on_fail;
-                        if (ImGui::Checkbox("Stop on Fail", &b)) {
-                            LavenderHook::Globals::stop_on_fail = b;
-                            SaveMenuSettings();
-                            LavenderHook::Audio::PlayToggleSound(b);
+                        float ia = ItemAlpha(s_infoOverlayAnim, ha);
+                        ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ia);
+                        for (const auto& item : kInfoCheckboxes)
+                        {
+                            bool val = *item.value;
+                            if (ImGui::Checkbox(item.label, &val)) {
+                                *item.value = val;
+                                SaveMenuSettings();
+                                LavenderHook::Audio::PlayToggleSound(val);
+                            }
                         }
+                        ImGui::PopStyleVar();
+                        ImGui::Unindent(18.f);
+                        CollapsibleEnd();
                     }
 
                     // Performance Overlay — expandable with sub-options
@@ -764,129 +722,8 @@ namespace LavenderHook {
                             SaveMenuSettings();
                             LavenderHook::Audio::PlayToggleSound(mb);
                         }
-
-                        bool mf = LavenderHook::Globals::mute_fail;
-                        if (ImGui::Checkbox("Mute Stop on Fail", &mf)) {
-                            LavenderHook::Globals::mute_fail = mf;
-                            SaveMenuSettings();
-                            LavenderHook::Audio::PlayToggleSound(mf);
-                        }
                     }
                     ImGui::Unindent(8.0f);
-
-                    // Discord Webhook
-                    ImGui::Separator();
-                    {
-                        if (ImGui::Button("Discord Webhook", ImVec2(ImGui::GetContentRegionAvail().x, 0)))
-                            ImGui::OpenPopup("Discord Webhook Settings");
-                    }
-
-                    ImGui::PushStyleColor(ImGuiCol_ModalWindowDimBg, ImVec4(0.0f, 0.0f, 0.0f, 0.65f));
-                    if (ImGui::BeginPopupModal("Discord Webhook Settings", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
-                    {
-                        ImGui::TextUnformatted("Discord Webhook Settings");
-                        ImGui::Separator();
-
-                        ImGui::AlignTextToFramePadding();
-                        ImGui::TextUnformatted("Webhook URL:");
-                        ImGui::SameLine();
-                        char urlBuf[1024];
-                        std::strncpy(urlBuf, LavenderHook::Webhook::url.c_str(), sizeof(urlBuf));
-                        urlBuf[sizeof(urlBuf) - 1] = 0;
-                        ImGui::SetNextItemWidth(400.0f);
-                        if (ImGui::InputText("##webhook_url", urlBuf, sizeof(urlBuf)))
-                        {
-                            LavenderHook::Webhook::url = urlBuf;
-                            SaveMenuSettings();
-                        }
-
-                        ImGui::AlignTextToFramePadding();
-                        ImGui::TextUnformatted("User ID:");
-                        ImGui::SameLine();
-                        char uidBuf[64];
-                        std::strncpy(uidBuf, LavenderHook::Webhook::user_id.c_str(), sizeof(uidBuf));
-                        uidBuf[sizeof(uidBuf) - 1] = 0;
-                        ImGui::SetNextItemWidth(200.0f);
-                        if (ImGui::InputText("##webhook_uid", uidBuf, sizeof(uidBuf)))
-                        {
-                            LavenderHook::Webhook::user_id = uidBuf;
-                            SaveMenuSettings();
-                        }
-
-                        ImGui::Separator();
-                        bool mf = LavenderHook::Webhook::map_finished_enabled;
-                        if (ImGui::Checkbox("Map Finished", &mf))
-                        {
-                            LavenderHook::Webhook::map_finished_enabled = mf;
-                            SaveMenuSettings();
-                            LavenderHook::Audio::PlayToggleSound(mf);
-                        }
-                        if (LavenderHook::Webhook::map_finished_enabled)
-                        {
-                            char msgBuf[512];
-                            std::strncpy(msgBuf, LavenderHook::Webhook::map_finished_msg.c_str(), sizeof(msgBuf));
-                            msgBuf[sizeof(msgBuf) - 1] = 0;
-                            ImGui::Indent(16.0f);
-                            ImGui::SetNextItemWidth(400.0f);
-                            if (ImGui::InputText("##map_finished_msg", msgBuf, sizeof(msgBuf)))
-                            {
-                                LavenderHook::Webhook::map_finished_msg = msgBuf;
-                                SaveMenuSettings();
-                            }
-                            ImGui::Unindent(16.0f);
-                        }
-
-                        bool cd = LavenderHook::Webhook::core_destroyed_enabled;
-                        if (ImGui::Checkbox("Core Destroyed", &cd))
-                        {
-                            LavenderHook::Webhook::core_destroyed_enabled = cd;
-                            SaveMenuSettings();
-                            LavenderHook::Audio::PlayToggleSound(cd);
-                        }
-                        if (LavenderHook::Webhook::core_destroyed_enabled)
-                        {
-                            char msgBuf[512];
-                            std::strncpy(msgBuf, LavenderHook::Webhook::core_destroyed_msg.c_str(), sizeof(msgBuf));
-                            msgBuf[sizeof(msgBuf) - 1] = 0;
-                            ImGui::Indent(16.0f);
-                            ImGui::SetNextItemWidth(400.0f);
-                            if (ImGui::InputText("##core_destroyed_msg", msgBuf, sizeof(msgBuf)))
-                            {
-                                LavenderHook::Webhook::core_destroyed_msg = msgBuf;
-                                SaveMenuSettings();
-                            }
-                            ImGui::Unindent(16.0f);
-                        }
-
-                        ImGui::Separator();
-                        {
-                            ImGui::AlignTextToFramePadding();
-                            ImGui::TextUnformatted("Placeholders:");
-                            ImGui::SameLine();
-                            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.6f, 0.6f, 0.8f, 1.0f));
-                            ImGui::SmallButton("(?)");
-                            ImGui::PopStyleColor();
-                            if (ImGui::IsItemHovered())
-                            {
-                                ImGui::BeginTooltip();
-                                ImGui::TextUnformatted("@User       - Mentions the configured user");
-                                ImGui::TextUnformatted("@Wave       - Current wave number");
-                                ImGui::TextUnformatted("@Gamemode   - Current game mode");
-                                ImGui::TextUnformatted("@Difficulty - Difficulty level");
-                                ImGui::TextUnformatted("@Modifiers  - Active modifiers (Hardcore/Rifted)");
-                                ImGui::TextUnformatted("@Bonus      - Bonus wave type");
-                                ImGui::TextUnformatted("@Map        - Map name");
-                                ImGui::EndTooltip();
-                            }
-                        }
-
-                        ImGui::Separator();
-                        if (ImGui::Button("Close", ImVec2(120, 0)))
-                            ImGui::CloseCurrentPopup();
-
-                        ImGui::EndPopup();
-                    }
-                    ImGui::PopStyleColor();
 
                     // Windows section
                     ImGui::Separator();
@@ -919,23 +756,19 @@ namespace LavenderHook {
                     ImGui::TextDisabled("Theme:");
 
                     {
-                        const char* themes[] = { "Default", "Polished" };
+                        const char* themes[] = { "Old", "Polished" };
                         int current = LavenderHook::Globals::use_polished_overlay ? 1 : 0;
                         if (ImGui::Combo("##theme_sel", &current, themes, 2))
                         {
                             LavenderHook::Globals::use_polished_overlay = (current == 1);
                             if (current == 1) {
-                                if (ColorsMatch(MAIN_RED, DEF_MAIN_RED) && ColorsMatch(MID_RED, DEF_MID_RED) && ColorsMatch(DARK_RED, DEF_DARK_RED)) {
-                                    MAIN_RED = POLISHED_MAIN_RED;
-                                    MID_RED = POLISHED_MID_RED;
-                                    DARK_RED = POLISHED_DARK_RED;
-                                }
+                                MAIN_RED = POLISHED_MAIN_RED;
+                                MID_RED = POLISHED_MID_RED;
+                                DARK_RED = POLISHED_DARK_RED;
                             } else {
-                                if (ColorsMatch(MAIN_RED, POLISHED_MAIN_RED) && ColorsMatch(MID_RED, POLISHED_MID_RED) && ColorsMatch(DARK_RED, POLISHED_DARK_RED)) {
-                                    MAIN_RED = DEF_MAIN_RED;
-                                    MID_RED = DEF_MID_RED;
-                                    DARK_RED = DEF_DARK_RED;
-                                }
+                                MAIN_RED = OLD_MAIN_RED;
+                                MID_RED = OLD_MID_RED;
+                                DARK_RED = OLD_DARK_RED;
                             }
                             SaveMenuSettings();
                             ApplyThemeToImGui();
@@ -958,10 +791,10 @@ namespace LavenderHook {
 
                         if (ImGui::Button("Reset to Default"))
                         {
-                            MAIN_RED = DEF_MAIN_RED;
-                            MID_RED = DEF_MID_RED;
-                            DARK_RED = DEF_DARK_RED;
-                            LavenderHook::Globals::use_polished_overlay = false;
+                            MAIN_RED = POLISHED_MAIN_RED;
+                            MID_RED = POLISHED_MID_RED;
+                            DARK_RED = POLISHED_DARK_RED;
+                            LavenderHook::Globals::use_polished_overlay = true;
                             SaveMenuSettings();
                             SaveTheme();
                             ApplyThemeToImGui();

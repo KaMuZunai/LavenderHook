@@ -9,9 +9,10 @@
 #include <cstdlib>
 
 #include "misc/Globals.h"
+#include "misc/FileLog.h"
 #include "memory/hooks.h"
-#include "ui/components/console.h"
-#include "misc/logmonitor/LogMonitor.h"
+#include "config/ConfigManager.h"
+#include "ui/UIWindows/console.h"
 
 static void HideAndDetachConsole()
 {
@@ -24,7 +25,7 @@ static void HideAndDetachConsole()
     FreeConsole();
 }
 
-BOOL CALLBACK EnumWindowsCallback(HWND hwnd, LPARAM)
+static BOOL CALLBACK EnumWindowsCallback(HWND hwnd, LPARAM)
 {
     DWORD process_id = 0;
     GetWindowThreadProcessId(hwnd, &process_id);
@@ -34,61 +35,74 @@ BOOL CALLBACK EnumWindowsCallback(HWND hwnd, LPARAM)
     if (GetWindow(hwnd, GW_OWNER) != nullptr) return TRUE;
 
     LavenderHook::Globals::window_handle = hwnd;
+
+    char title[256] = {};
+    GetWindowTextA(hwnd, title, sizeof(title));
+    LavenderHook::Globals::window_title = title;
+
     return FALSE;
 }
 
 // Entry thread
 DWORD WINAPI CheatEntry(HMODULE hModule)
 {
+    LavenderHook::Log::Write("CheatEntry started");
+
     HideAndDetachConsole();
 
     srand(static_cast<unsigned>(time(nullptr)));
 
-    // Cache the game window
     EnumWindows(EnumWindowsCallback, 0);
 
-    if (!LavenderHook::Globals::window_handle)
-    {
-        LavenderConsole::GetInstance().Log("No window handle found.");
-        goto end;
-    }
+    // Use process executable name for settings path (more reliable than window title)
+    char exePath[MAX_PATH] = {};
+    GetModuleFileNameA(nullptr, exePath, MAX_PATH);
+    std::string exeName = exePath;
+    size_t pos = exeName.find_last_of("\\/");
+    if (pos != std::string::npos)
+        exeName = exeName.substr(pos + 1);
+    // Remove .exe extension if present
+    size_t dotPos = exeName.find_last_of(".");
+    if (dotPos != std::string::npos)
+        exeName = exeName.substr(0, dotPos);
 
-    // Cache initial window size
+    LavenderHook::Config::SetCurrentGameTitle(exeName);
+    LavenderHook::Log::Write(("Settings path: " + exeName).c_str());
+
+    if (LavenderHook::Globals::window_handle)
     {
         RECT rect{};
         GetWindowRect(LavenderHook::Globals::window_handle, &rect);
         LavenderHook::Globals::window_width = rect.right - rect.left;
         LavenderHook::Globals::window_height = rect.bottom - rect.top;
+        LavenderHook::Log::Write("Window handle found");
+    }
+    else
+    {
+        LavenderHook::Log::Write("No window handle found — continuing with DX11/DX12 hooks");
     }
 
-    // Install hooks
+    LavenderHook::Log::Write("Initializing MinHook");
     if (!LavenderHook::Hooks::Initialize())
     {
-        LavenderConsole::GetInstance().Log("Failed to initialize MinHook.");
+        LavenderHook::Log::Write("MinHook init failed");
         goto end;
     }
+    LavenderHook::Log::Write("MinHook init OK");
+
     if (!LavenderHook::Hooks::Hook())
     {
-        LavenderConsole::GetInstance().Log("Failed to hook functions.");
+        LavenderHook::Log::Write("Hook() returned false");
         goto end;
     }
-
-    // Start background log monitor thread
-    LavenderHook::LogMonitor::Start();
+    LavenderHook::Log::Write("Hook() completed successfully");
 
 end:
-	while (true)  // Probably gonna remove this in the future entirely
-    // while (!GetAsyncKeyState(VK_END))
+    while (true)
         Sleep(100);
 
-    // Unhook DX/UI
     LavenderHook::Hooks::Unhook();
-
-    // Stop monitor
-    LavenderHook::LogMonitor::Stop();
-
     HideAndDetachConsole();
-
     Sleep(200);
     FreeLibraryAndExitThread(hModule, 0);
     return 0;
@@ -99,22 +113,17 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID)
     switch (reason)
     {
     case DLL_PROCESS_ATTACH:
+    {
         DisableThreadLibraryCalls(hModule);
         LavenderHook::Globals::dll_module = hModule;
 
-        HideAndDetachConsole();
-
-        {
-            HANDLE h = CreateThread(nullptr, 0,
-                (LPTHREAD_START_ROUTINE)CheatEntry,
-                hModule, 0, nullptr);
-            if (h) CloseHandle(h);
-        }
+        HANDLE h = CreateThread(nullptr, 0,
+            (LPTHREAD_START_ROUTINE)CheatEntry,
+            hModule, 0, nullptr);
+        if (h) CloseHandle(h);
         break;
-
+    }
     case DLL_PROCESS_DETACH:
-        break;
-
     case DLL_THREAD_ATTACH:
     case DLL_THREAD_DETACH:
         break;

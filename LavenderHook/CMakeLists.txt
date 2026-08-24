@@ -4,10 +4,6 @@ project(LavenderHook)
 
 set(CMAKE_CXX_STANDARD 17)
 
-include_directories(${CMAKE_SOURCE_DIR}/include)
-
-link_directories(${CMAKE_SOURCE_DIR}/libs)
-
 # Source files
 file(GLOB_RECURSE SRC_FILES
     ${CMAKE_SOURCE_DIR}/src/*.cpp
@@ -28,7 +24,7 @@ target_sources(LavenderHook PRIVATE ${RESOURCE_FILES})
 
 # Link dependencies
 target_link_libraries(LavenderHook
-    d3dx11.lib
+    d3d9
     Ws2_32
     Iphlpapi
     Shell32
@@ -38,9 +34,10 @@ target_link_libraries(LavenderHook
     Dwmapi
     Version
     Xinput
-    ViGEmClient
     Setupapi
     Winhttp
+    opengl32
+    dbghelp
 )
 
 if(MSVC)

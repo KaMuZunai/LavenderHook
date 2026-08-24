@@ -19,13 +19,13 @@ VS_VERSION_INFO VERSIONINFO
     BLOCK "040904b0"
     BEGIN
       VALUE "CompanyName",      ""
-      VALUE "FileDescription",  "LavenderHook - QoL Automation Software\0"
+      VALUE "FileDescription",  "LavenderHook - Universal DirectX/OpenGL Overlay Hook\0"
       VALUE "FileVersion",      "1.3.0.3\0"
       VALUE "InternalName",     "LavenderHook.dll\0"
       VALUE "OriginalFilename", "LavenderHook.dll\0"
       VALUE "ProductName",      "LavenderHook\0"
       VALUE "ProductVersion",   "1.3.0.3\0"
-      VALUE "LegalCopyright",   "Copyright (c) 2026 LichtAbzeichen8. Licensed under MIT.\0"
+      VALUE "LegalCopyright",   "Copyright (c) 2026 KaMuZunai. Licensed under MIT.\0"
     END
   END
   BLOCK "VarFileInfo"
@@ -36,8 +36,6 @@ VS_VERSION_INFO VERSIONINFO
 
 DROP_LEFT   RCDATA "../images/DropLeft.png"
 DROP_DOWN   RCDATA "../images/DropDown.png"
-MENU_LOGO   RCDATA "../images/MenuLogo.png"
-
 EMPTY_ICO   RCDATA "../images/empty.png"
 
 ARROW_ICO   RCDATA "../images/arrow.png"
@@ -64,7 +62,11 @@ TOGGLE_ON    WAVE "../sounds/toggle_on.wav"
 TOGGLE_OFF   WAVE "../sounds/toggle_off.wav"
 STOP_ON_FAIL WAVE "../sounds/stop_on_fail.wav"
 HIDE_NOTIF   WAVE "../sounds/hide_window.wav"
+
 TOGGLE_ON_POLISHED    WAVE "../sounds/toggle_on_polished.wav"
 TOGGLE_OFF_POLISHED   WAVE "../sounds/toggle_off_polished.wav"
 STOP_ON_FAIL_POLISHED WAVE "../sounds/stop_on_fail_polished.wav"
 HIDE_NOTIF_POLISHED   WAVE "../sounds/hide_window_polished.wav"
+
+FONT_OPEN_SANS_REGULAR  RCDATA "../fonts/OpenSans-Regular.ttf"
+FONT_OPEN_SANS_SEMIBOLD RCDATA "../fonts/OpenSans-Semibold.ttf"

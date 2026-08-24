@@ -119,10 +119,6 @@ namespace LavenderHook {
             EnsureInit();
             if (!s_engineInited) return;
 
-            // Only play fail sound if stop_on_fail is enabled and not muted
-            if (!LavenderHook::Globals::stop_on_fail) return;
-            if (LavenderHook::Globals::mute_fail) return;
-
             float vol = (float)LavenderHook::Globals::sound_volume / 100.0f;
             bool polished = LavenderHook::Globals::use_polished_overlay;
             if (polished) {

@@ -3,8 +3,6 @@
 
 extern ImTextureID g_dropLeftTex;
 extern ImTextureID g_dropDownTex;
-extern ImTextureID g_menuLogoTex;
-
 extern ImTextureID g_emptyIcoTex;
 
 extern ImTextureID g_arrowIcoTex;

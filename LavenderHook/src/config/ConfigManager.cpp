@@ -5,6 +5,27 @@
 
 namespace LavenderHook::Config {
 
+    static std::string g_game_title;
+
+    void SetCurrentGameTitle(const std::string& title)
+    {
+        g_game_title = SanitizeFileName(title);
+    }
+
+    std::string SanitizeFileName(const std::string& name)
+    {
+        std::string safe = name;
+        for (auto& c : safe)
+        {
+            if (c == '\\' || c == '/' || c == ':' || c == '*' ||
+                c == '?' || c == '"' || c == '<' || c == '>' || c == '|')
+                c = '_';
+        }
+        if (safe.empty())
+            safe = "Unknown";
+        return safe;
+    }
+
     std::string GetBaseDir()
     {
         char* app = nullptr;
@@ -19,6 +40,21 @@ namespace LavenderHook::Config {
 
         dir += "\\LavenderHook";
         CreateDirectoryA(dir.c_str(), nullptr);
+
+        if (!g_game_title.empty())
+        {
+            dir += "\\" + g_game_title;
+            CreateDirectoryA(dir.c_str(), nullptr);
+        }
+
+        // Verify directory exists
+        DWORD attr = GetFileAttributesA(dir.c_str());
+        if (attr == INVALID_FILE_ATTRIBUTES || !(attr & FILE_ATTRIBUTE_DIRECTORY))
+        {
+            // Directory doesn't exist, try to create it
+            CreateDirectoryA(dir.c_str(), nullptr);
+        }
+
         return dir;
     }
 

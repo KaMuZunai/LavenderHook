@@ -4,9 +4,6 @@
 
 namespace LavenderHook::Config {
 
-    // Returns the config base directory (%APPDATA%\LavenderHook), creating it.
-    std::string GetBaseDir();
-
     class Store {
     public:
         // Legacy / default config
@@ -29,5 +26,10 @@ namespace LavenderHook::Config {
         std::unordered_map<std::string, int> m_ints;
         bool m_dirty = false;
     };
+
+    // Per-game config directory support
+    void SetCurrentGameTitle(const std::string& title);
+    std::string GetBaseDir();
+    std::string SanitizeFileName(const std::string& name);
 
 } // namespace LavenderHook::Config

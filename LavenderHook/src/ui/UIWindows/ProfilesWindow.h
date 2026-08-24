@@ -2,9 +2,6 @@
 
 namespace LavenderHook::UI::Windows {
 
-    class ProfilesWindow {
-    public:
-        static void Render(bool wantVisible);
-    };
+    void RenderProfilesWindow(bool wantVisible);
 
-} // namespace LavenderHook::UI::Windows
+}

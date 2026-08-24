@@ -1,311 +1,154 @@
-# LavenderHook - QoL DDA Automation Software
+# LavenderHook
 
-LavenderHook is an in-game overlay for the sole purpose of making AFKing
-in Dungeon Defenders: Awakened easier by providing tools that automatically
-perform actions or help with a few in game issues.
+LavenderHook is a universal graphics API overlay hook for Windows. It loads
+into a running DirectX/OpenGL process and draws a Dear ImGui based overlay on
+top of it, exposing a set of debug and quality-of-life utilities.
 
-----------------------------------------------------------------------------------
+It provides hooks for the most common Windows renderers:
 
-# Installation
+- **DirectX 9** (IDirect3DDevice9::EndScene)
+- **DirectX 11** (IDXGISwapChain::Present)
+- **DirectX 12** (IDXGISwapChain::Present)
+- **OpenGL** (wglSwapBuffers)
 
-Browse your Dungeon Defenders: Awakened installation directory something like:
+Hooking is done through [MinHook](https://github.com/TsudaKageyu/minhook).
 
-`steamapps\common\Dungeon Defenders Awakened`
+---------------------------------------------------------------------------------
 
-You may drop the **Engine** folder in and replace files. Otherwise,
-manually place the files as follows:
-
-Replace:\
-`Dungeon Defenders Awakened\Engine\Binaries\ThirdParty\Ogg\Win64\libogg_64.dll`\
-`Dungeon Defenders Awakened\Engine\Binaries\ThirdParty\Ogg\Win64\PluginLoader.ini`
-
-Create Plugins folder and add:\
-`Dungeon Defenders Awakened\Engine\Binaries\ThirdParty\Plugins\LavenderUpdater.dll`\
-`Dungeon Defenders Awakened\Engine\Binaries\ThirdParty\Plugins\LavenderHook\LavenderHook.dll`
-
-If you dont want to bundle the updater you can instead do this:\
-`Dungeon Defenders Awakened\Engine\Binaries\ThirdParty\Plugins\LavenderHook.dll`
-
-After installation, launching the game normally should automatically
-load the overlay.
-
-You may also need to install **ViGEmBus** if you want to use the **Virtual Controller**\
-it may be downloaded from here:\
-`https://github.com/nefarius/ViGEmBus/releases/tag/v1.22.0`
-
-----------------------------------------------------------------------------------
-
-# Main Features
+# Features
 
 ## Menu Access
 
-Press **Insert** or **CTRL + F1** to open the overlay menu.
+Press **Insert** or **CTRL + F1** to toggle the overlay menu.
 
-## Exit Button
+## Debug Window
 
-Force closes the game when held long enough.\
-Note: It will **NOT** cause the game to save the data before closing.
+- **Game Speed**\
+  Overrides the process speed with a configurable multiplier (0.10x – 10.00x)
+  by hooking the QueryPerformanceCounter / QueryPerformanceFrequency timers.
 
-## Travel to Menu Button
+- **Fullscreen Borderless**\
+  Strips window borders and maximizes the window to the current monitor
+  (one-shot, self-disabling toggle).
 
-Returns the player to the main menu by calling the game's internal travel function.\
-Hold to activate (~1.5 seconds) to prevent accidental activation.
+- **Texture Capture**\
+  Captures and dumps game textures to the `DumpedTextures` folder.
 
-## Settings Button
+- **Wireframe Mode**\
+  Forces rendering in wireframe mode (DirectX 9 / DirectX 11).
 
-Opens the main settings menu.
+- **No Fog**\
+  Disables fog rendering (DirectX 9).
+
+- **Freeze Frame**\
+  Prevents the game from presenting new frames (DirectX 9 / DirectX 11).
+
+Every toggle supports up to two configurable combo hotkeys (ESC binds to None)
+and can be saved and restored through profiles.
+
+## Info Overlay
+
+Displays small indicators (e.g. ping, server) in the top-right corner of the
+process.
+
+## Performance Overlay
+
+Displays live resource statistics — FPS, RAM, CPU, and GPU usage — each of
+which can be toggled individually.
+
+## Console
+
+A built-in log console that captures hook status, errors, and runtime messages.
+
+## Profiles
+
+Create profiles that snapshot the currently active functions/toggles and
+restore them with a single press. Profiles support rename, delete, and an
+assignable hotkey.
 
 ## Settings
 
-The settings window will have the main settings for the entire overlay. These
-include:
+- **Theme Colors**\
+  RGB values for the primary, alternate, and highlight colors used throughout
+  the overlay.
 
-### General Settings
+- **Menu Size**\
+  A slider that scales the entire UI between 50% and 200% with smooth
+  animation.
 
-- **Info Overlay**\
-When enabled, an indicator of active buttons will be displayed in the top-right
-corner of the process.
+- **Audio**\
+  A master volume slider for overlay sounds, with options to mute button
+  clicks and the stop-on-fail sound.
 
-- **Process Overlay on Hide**\
-When enabled, it will display a small video overlay that is uninteractable outside
-of moving it around and resizing it when the Hide Window button is currently enabled.
+- **Windows**\
+  A collapsible list to show or hide each overlay window (Debug, Info Overlay,
+  Performance Overlay, Console, Profiles, Menu Logo).
 
-- **Stop on Fail**\
-When enabled, it will stop all running buttons associated with input automation
-when a core gets destroyed and also play a sound. (Note: Only when hosting.)
+## Menu Logo
 
-- **Performance Overlay**\
-When enabled, it will display resource stats of the computer, which can also
-individually be toggled on or off, such as:\
-FPS / Frames per Second\
-RAM Usage\
-CPU Usage\
-GPU Usage
+A randomized animated logo (several chibi witch girl images) shown in the
+bottom-left corner of the process.
 
-### Menu Size
+## Misc
 
-A slider that scales the entire UI between 50 % and 200 % with a smooth animation.
+- **Network Monitor**\
+  Hooks winsock / iphlpapi calls to monitor network activity.
 
-### Audio Settings
+- **Focus Shim**\
+  Simulates an unfocused window state while the overlay menu is open.
 
-- **Volume Slider**\
-A volume slider for all overlay sounds (0–100 %).
+- **Logging**\
+  A file log is written alongside the hook to help diagnose issues.
 
-- **Mute Button Clicks**\
-Mutes the sounds when a button gets clicked or toggled on/off.
+- **Crash Handler**\
+  Generates a minidump if the hooked process crashes.
 
-- **Mute Stop on Fail**\
-Mutes the Stop on Fail sound that plays.
+- **Per-Process Configuration**\
+  Settings are stored per executable name (e.g. `game.exe.ini`), so the hook
+  keeps independent settings for every target process.
 
-### Windows
+---------------------------------------------------------------------------------
 
-A collapsible list of toggleable windows:
+# Installation
 
-- **General Window**\
-When enabled, the General window will be visible; otherwise, invisible.
+Build `LavenderHook.dll` and load it into the target process with your
+preferred injection method (manual map, proxy DLL, or an injector of your
+choice). When injected, the hook initializes MinHook, locates the target
+window, installs the renderer hooks it finds, and draws the overlay on the
+next presented frame.
 
-- **Misc Window**\
-When enabled, the Misc window will be visible; otherwise, invisible.
+---------------------------------------------------------------------------------
 
-- **Buffing Window**\
-When enabled, the Buffing window will be visible; otherwise, invisible.
+# Building
 
-- **Virtual Controller**\
-When enabled, the Virtual Controller window will be visible; otherwise, invisible.
+The project uses CMake and targets the MSVC toolchain (Windows SDK).
 
-- **Profiles Window**\
-When enabled, the Profiles window will be visible; otherwise, invisible.
+Requirements:
 
-- **Macro Manager**\
-When enabled, the Macro Manager window will be visible; otherwise, invisible.
+- Visual Studio 2022 (or Build Tools) with the C++ workload
+- CMake 3.10+
+- Windows SDK (DirectX headers)
 
-- **Mastery Level**\
-When enabled, will display a level icon that will gain experience by playing the game
-with a custom XP system. This does not provide any benefits outside of being fun.
+Example for x64:
 
-- **Wave Overlay**\
-When enabled, will display a wave progression bar during combat phases that displays
-enemies alive / max enemies, a boss health bar, time left and current wave / max wave
-due to the default in game bar often disappearing.
+```bat
+cmake -S LavenderHook -B build-x64 -G "Visual Studio 17 2022" -A x64
+cmake --build build-x64 --config Release
+```
 
-- **Console**\
-When enabled, the Console will be visible; otherwise, invisible.
+Example for x86:
 
-- **Menu Logo**\
-When enabled, the menu logo (randomized from several chibi witch girl images)
-will be displayed in the bottom-left corner of the process.
+```bat
+cmake -S LavenderHook -B build-x86 -G "Visual Studio 17 2022" -A Win32
+cmake --build build-x86 --config Release
+```
 
-### Theme Colors
+The build produces `Release\LavenderHook.dll` for each architecture. The
+project also ships `buildx64.bat` and `buildx86.bat` scripts.
 
-- **R G B Colors**\
-RGB colors for the main, alt, and bright colors. These affect the window icons,
-sliders, hovered/active buttons, window buttons, main menu buttons, checkbox buttons,
-process overlay, and notifications.
+---------------------------------------------------------------------------------
 
-- **Reset to Default**\
-A button that resets the theme colors back to their default values.
-
-----------------------------------------------------------------------------------
-
-## General Window
-
-This window has the main buttons for input automation, all of which are also configurable
-to some extent. These may include:
-
-- **Ready Up**\
-By default: Automatically holds down G for 2 seconds and then pauses for 3 seconds.\
-This is used to automatically ready up for the next wave.
-
-- - You may configure:\
-Hotkey - Up to 2 combo hotkeys to quickly toggle the button. (ESC binds to None.)\
-Key - The key it holds down.\
-Hold - The duration the key is held down for.\
-Delay - The time it pauses after holding down the key before repeating its actions.
-
-- **Force Ready Up**\
-By default: Automatically holds down CTRL + G for 5 seconds and then pauses for 10 seconds.\
-This is used to automatically force the team to ready up for the next wave.
-
-- - You may configure:\
-Hotkey - Up to 2 combo hotkeys to quickly toggle the button. (ESC binds to None.)\
-CTRL - The primary key it holds down.\
-G - The secondary key it holds down.\
-Hold - The duration the keys are held down for.\
-Delay - The time it pauses after holding down the keys before repeating its actions.
-
-- **Skip Cutscene**\
-By default: Automatically holds down Space for 2 seconds and then pauses for 4 seconds.\
-This is used to automatically skip cinematics, mainly boss cinematics to save time.
-
-- - You may configure:\
-Hotkey - Up to 2 combo hotkeys to quickly toggle the button. (ESC binds to None.)\
-Key - The key it holds down.\
-Hold - The duration the key is held down for.\
-Delay - The time it pauses after holding down the key before repeating its actions.
-
-- **Auto Clicker**\
-By default: Automatically presses down the right mouse button once every 100 milliseconds.\
-This is mainly used to upgrade a large number of towers.
-
-- - You may configure:\
-Hotkey - Up to 2 combo hotkeys to quickly toggle the button. (ESC binds to None.)\
-Interval - The time between each repeating action.
-
-----------------------------------------------------------------------------------
-
-## Misc Window
-
-This window has functions that are not directly tied to automation functions but rather QoL
-functions.
-
-- **Flash Heal Fix**\
-This will simulate a forced cursor in the center of the process. This is mainly to help
-Flash Heal not bug out and perform a sideways Flash Heal that does not actually heal
-anything when the main cursor is outside of the window.
-
-- - You may configure:\
-Hotkey - Up to 2 combo hotkeys to quickly toggle the button. (ESC binds to None.)
-
-- **Always Cursor**\
-This will always display a custom cursor in the game. This is mainly used when the player
-cursor, specifically in the Summoner's Overlord mode, suddenly becomes invisible and
-hard to locate the actual cursor position.
-
-- - You may configure:\
-Hotkey - Up to 2 combo hotkeys to quickly toggle the button. (ESC binds to None.)
-
-- **Hide Window**\
-This will turn the window invisible and uninteractable (or far off the screen in certain cases)
-to keep the window still active and allow the functions and game to progress correctly,
-unlike minimizing the game. When enabled, it will display a small notification at the start
-telling you that an icon in the system tray will appear that can be used to restore the
-window back to its original form.
-
-- - You may configure:\
-Hotkey - Up to 2 combo hotkeys to quickly toggle the button. (ESC binds to None.)
-
-----------------------------------------------------------------------------------
-
-## Buffing Window
-
-This window has auto-cast toggles for each Summoner buff. Buffs may include:
-
-- **Flash Buff**\
-By default: Automatically presses F once every 8 seconds.\
-This is used to automatically use the Flash Heal ability on Summoner along with the
-Flash Buff rune to buff your defenses.
-
-- - You may configure:\
-Hotkey - Up to 2 combo hotkeys to quickly toggle the button. (ESC binds to None.)\
-Key - The key it holds down.\
-Interval - The time between each repeating action.
-
-- **Pet Boost**\
-Automatically casts the Pet Boost ability.\
-Accepts a configurable key, interval, and mana threshold (default 15–70 mana).
-
-- **Wrath Form**\
-Automatically casts Wrath Form.\
-Accepts a configurable key, interval, and mana threshold (default 15–70 mana).
-
-- **Overcharge**\
-Automatically casts Overcharge then spams the activation key at 50 ms intervals.\
-Accepts a configurable key, interval, and mana threshold (default 15–70 mana).
-
-- **Defense Boost**\
-Automatically casts Defense Boost at a longer interval (default 13000 ms).
-
-All buffs have individually assignable hotkeys and persist their settings.
-
-----------------------------------------------------------------------------------
-
-## Virtual Controller Window
-
-This window has a on screen controller layout that lets you control the game
-or mainly a split screen character.
-
-The window will not connect without ViGEmBus installed.
-
-Features a 16 button grid with hover/active animations, shift-latching for alternative
-mappings, and left/right analog stick pads that can be clicked to drag or right-clicked
-to latch the LS/RS press.
-
-----------------------------------------------------------------------------------
-
-## Profiles Window
-
-This window will have an option to create a new profile which will save your
-currently active functions into a profile. The next time the profile button is
-pressed it will toggle all the functions within the profile.
-
-The Profiles additionally have a adjustable Hotkey button, rename button and 
-a delete button. Profiles also save and restore macro states.
-
-----------------------------------------------------------------------------------
-
-## Macro Manager & Macro Editor
-
-This window lets you record, edit, and play back keyboard and mouse macro sequences
-with adjustable timing.
-
-The **Manager** lists all saved macros with expandable rows and animated dropdowns
-for selection and activation.
-
-The **Editor** supports up to 15 action types including:
-Key Down, Key Up, all mouse button presses, Wait (ms), Activate/Deactivate UI states,
-and mana-conditional state control (If Min Mana Activate, If Max Mana Deactivate, etc.).
-
-----------------------------------------------------------------------------------
-
-## Wave Overlay
-
-Rendered outside the menu and always visible when enabled. Displays wave progress,
-enemies alive / max enemies, a boss health bar, wave timer, current wave / max wave,
-and current mana. Data is read from the game's memory via AOB pattern hooks.
-
-----------------------------------------------------------------------------------
-
-# Licensing
+# License
 
 ## LavenderHook License (MIT License)
 
@@ -323,12 +166,11 @@ in all copies or substantial portions of the Software.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
 
-----------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
 
 # Third-Party Libraries
 
-All Licenses can be found under the `ThirdParty Licenses` folder or their respective
-directories.
+All licenses can be found under the `ThirdParty Licenses` folder.
 
 ## MinHook
 
@@ -345,7 +187,11 @@ be freely used, modified, and distributed without restriction.
 Dear ImGui is licensed under the MIT License. You may freely use,
 modify, and distribute it under MIT terms.
 
-## ViGEmBus
-ViGEmBus is licensed under the 3-Clause BSD License. It allows free use,
-modification, and redistribution in both source and binary forms, provided
-that the original copyright notice and license terms are retained.
+## stb
+
+stb_image and stb_image_write are released into the public domain.
+
+## Open Sans
+
+Open Sans (c) 2010-2011 Google Corporation is licensed under the Apache
+License, Version 2.0.
